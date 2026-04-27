@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from datetime import datetime
+from barcode_scanner import BarcodeScannerWindow  # Added import
+
 
 class AdminDashboard:
 
@@ -132,6 +134,21 @@ class AdminDashboard:
         )
         refresh_btn.pack(side=tk.LEFT, padx=5)
 
+        # Scanner Button Integration
+        scan_btn = tk.Button(
+            button_frame,
+            text="📷 SCAN BOOK",
+            font=("Helvetica", 11, "bold"),
+            bg="#17A2B8",  # Cyan/Teal color
+            fg=self.SECONDARY_COLOR,
+            command=self.open_scanner,
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=15,
+            pady=8
+        )
+        scan_btn.pack(side=tk.LEFT, padx=5)
+
         # Books treeview
         tree_frame = tk.Frame(self.book_tab, bg=self.SECONDARY_COLOR)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
@@ -156,13 +173,39 @@ class AdminDashboard:
 
         self.load_books()
 
+    # --- Scanner Methods ---
+    def open_scanner(self):
+        # Open the scanner window and pass the callback function
+        BarcodeScannerWindow(self.root, self.handle_scanned_barcode)
+
+    def handle_scanned_barcode(self, scanned_isbn):
+        # Find the book with this ISBN in the treeview
+        found = False
+        for item in self.books_tree.get_children():
+            values = self.books_tree.item(item, 'values')
+            if len(values) >= 4 and values[3] == scanned_isbn:
+                # Select the item, focus it, and scroll to it
+                self.books_tree.selection_set(item)
+                self.books_tree.focus(item)
+                self.books_tree.see(item)
+                found = True
+
+                # Show success message
+                messagebox.showinfo("Scanner Success", f"Found book: {values[1]}")
+                break
+
+        if not found:
+            messagebox.showwarning("Not Found", f"No book found in the system with ISBN/Barcode: {scanned_isbn}")
+
+    # --- End Scanner Methods ---
+
     def setup_book_status_tab(self):
         # Status display
         status_frame = tk.Frame(self.status_tab, bg=self.SECONDARY_COLOR)
         status_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
         tk.Label(status_frame, text="📊 LIBRARY STATISTICS", font=("Helvetica", 14, "bold"),
-                fg=self.PRIMARY_COLOR, bg=self.SECONDARY_COLOR).pack(anchor=tk.W, pady=(0, 20))
+                 fg=self.PRIMARY_COLOR, bg=self.SECONDARY_COLOR).pack(anchor=tk.W, pady=(0, 20))
 
         # Statistics cards
         stats_container = tk.Frame(status_frame, bg=self.SECONDARY_COLOR)
@@ -212,7 +255,7 @@ class AdminDashboard:
 
         # Book status treeview
         tk.Label(status_frame, text="\n📖 Individual Book Status:", font=("Helvetica", 12, "bold"),
-                fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(anchor=tk.W, pady=(20, 10))
+                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(anchor=tk.W, pady=(20, 10))
 
         tree_frame = tk.Frame(status_frame, bg=self.SECONDARY_COLOR)
         tree_frame.pack(fill=tk.BOTH, expand=True)
@@ -315,22 +358,22 @@ class AdminDashboard:
         add_window.configure(bg=self.SECONDARY_COLOR)
 
         tk.Label(add_window, text="Title:", font=("Helvetica", 11),
-                fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(20, 5))
+                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(20, 5))
         title_entry = tk.Entry(add_window, font=("Helvetica", 10), width=40)
         title_entry.pack(pady=(0, 10))
 
         tk.Label(add_window, text="Author:", font=("Helvetica", 11),
-                fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
+                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
         author_entry = tk.Entry(add_window, font=("Helvetica", 10), width=40)
         author_entry.pack(pady=(0, 10))
 
         tk.Label(add_window, text="ISBN:", font=("Helvetica", 11),
-                fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
+                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
         isbn_entry = tk.Entry(add_window, font=("Helvetica", 10), width=40)
         isbn_entry.pack(pady=(0, 10))
 
         tk.Label(add_window, text="Quantity:", font=("Helvetica", 11),
-                fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
+                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
         quantity_entry = tk.Entry(add_window, font=("Helvetica", 10), width=40)
         quantity_entry.pack(pady=(0, 20))
 
@@ -402,25 +445,25 @@ class AdminDashboard:
         update_window.configure(bg=self.SECONDARY_COLOR)
 
         tk.Label(update_window, text="Title:", font=("Helvetica", 11),
-                fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(20, 5))
+                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(20, 5))
         title_entry = tk.Entry(update_window, font=("Helvetica", 10), width=40)
         title_entry.insert(0, title)
         title_entry.pack(pady=(0, 10))
 
         tk.Label(update_window, text="Author:", font=("Helvetica", 11),
-                fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
+                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
         author_entry = tk.Entry(update_window, font=("Helvetica", 10), width=40)
         author_entry.insert(0, author)
         author_entry.pack(pady=(0, 10))
 
         tk.Label(update_window, text="ISBN:", font=("Helvetica", 11),
-                fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
+                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
         isbn_entry = tk.Entry(update_window, font=("Helvetica", 10), width=40)
         isbn_entry.insert(0, isbn)
         isbn_entry.pack(pady=(0, 10))
 
         tk.Label(update_window, text="Quantity:", font=("Helvetica", 11),
-                fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
+                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
         quantity_entry = tk.Entry(update_window, font=("Helvetica", 10), width=40)
         quantity_entry.insert(0, total_qty)
         quantity_entry.pack(pady=(0, 20))
