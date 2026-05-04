@@ -1,298 +1,200 @@
 import sqlite3
 from datetime import datetime, timedelta
-from abc import ABC, abstractmethod
-import hashlib
-
-class DatabaseEntity(ABC):
-    @abstractmethod
-    def to_dict(self):
-        pass
-
-    @abstractmethod
-    def save(self, connection):
-        pass
-
-
-class User(DatabaseEntity):
-
-    def __init__(self, username, password, role, user_id=None):
-        self.user_id = user_id
-        self.username = username
-        self.password = self._hash_password(password)
-        self.role = role
-        self.created_at = datetime.now()
-    
-    @staticmethod
-    def _hash_password(password):
-        return hashlib.sha256(password.encode()).hexdigest()
-    
-    def to_dict(self):
-        return {
-            'user_id': self.user_id,
-            'username': self.username,
-            'role': self.role,
-            'created_at': self.created_at
-        }
-    
-    def save(self, connection):
-        cursor = connection.cursor()
-        try:
-            cursor.execute('''
-                INSERT INTO users (username, password, role, created_at)
-                VALUES (?, ?, ?, ?)
-            ''', (self.username, self.password, self.role, self.created_at))
-            connection.commit()
-            return cursor.lastrowid
-        except sqlite3.IntegrityError:
-            raise Exception("Username already exists")
-
-
-class Book(DatabaseEntity):
-    
-    def __init__(self, title, author, isbn, quantity, book_id=None):
-        self.book_id = book_id
-        self.title = title
-        self.author = author
-        self.isbn = isbn
-        self.quantity = quantity
-        self.available_quantity = quantity
-        self.created_at = datetime.now()
-    
-    def to_dict(self):
-        return {
-            'book_id': self.book_id,
-            'title': self.title,
-            'author': self.author,
-            'isbn': self.isbn,
-            'quantity': self.quantity,
-            'available_quantity': self.available_quantity,
-            'created_at': self.created_at
-        }
-    
-    def save(self, connection):
-        cursor = connection.cursor()
-        cursor.execute('''
-            INSERT INTO books (title, author, isbn, quantity, available_quantity, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (self.title, self.author, self.isbn, self.quantity, self.available_quantity, self.created_at))
-        connection.commit()
-        return cursor.lastrowid
-
-
-class Transaction(DatabaseEntity):
-    
-    def __init__(self, user_id, book_id, transaction_type, transaction_id=None):
-        self.transaction_id = transaction_id
-        self.user_id = user_id
-        self.book_id = book_id
-        self.transaction_type = transaction_type  # 'borrow' or 'return'
-        self.transaction_date = datetime.now()
-        self.due_date = datetime.now() + timedelta(days=14) if transaction_type == 'borrow' else None
-    
-    def to_dict(self):
-        return {
-            'transaction_id': self.transaction_id,
-            'user_id': self.user_id,
-            'book_id': self.book_id,
-            'transaction_type': self.transaction_type,
-            'transaction_date': self.transaction_date,
-            'due_date': self.due_date
-        }
-    
-    def save(self, connection):
-        cursor = connection.cursor()
-        cursor.execute('''
-            INSERT INTO transactions (user_id, book_id, transaction_type, transaction_date, due_date)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (self.user_id, self.book_id, self.transaction_type, self.transaction_date, self.due_date))
-        connection.commit()
-        return cursor.lastrowid
 
 
 class DatabaseManager:
-    
-    def __init__(self, db_name='library.db'):
+    def __init__(self, db_name="library.db"):
         self.db_name = db_name
-        self.connection = None
-        self.connect()
 
-    def connect(self):
-        self.connection = sqlite3.connect(self.db_name)
-        self.connection.row_factory = sqlite3.Row
+    def get_connection(self):
+        conn = sqlite3.connect(self.db_name)
+        conn.row_factory = sqlite3.Row
+        return conn
 
     def create_tables(self):
-        cursor = self.connection.cursor()
-        
-        # Users table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL,
-                role TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        # Books table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS books (
-                book_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                author TEXT NOT NULL,
-                isbn TEXT UNIQUE NOT NULL,
-                quantity INTEGER NOT NULL,
-                available_quantity INTEGER NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        # Transactions table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS transactions (
-                transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                book_id INTEGER NOT NULL,
-                transaction_type TEXT NOT NULL,
-                transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                due_date TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(user_id),
-                FOREIGN KEY (book_id) REFERENCES books(book_id)
-            )
-        ''')
-        
-        self.connection.commit()
-    
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT,
+            role TEXT
+        )''')
+
+        cursor.execute('''CREATE TABLE IF NOT EXISTS books (
+            book_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT,
+            author TEXT,
+            isbn TEXT UNIQUE,
+            quantity INTEGER,
+            available_quantity INTEGER
+        )''')
+
+        # Added status column to transactions
+        cursor.execute('''CREATE TABLE IF NOT EXISTS transactions (
+            transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            book_id INTEGER,
+            transaction_type TEXT,
+            transaction_date TEXT,
+            due_date TEXT,
+            status TEXT
+        )''')
+
+        conn.commit()
+        conn.close()
+
+    # --- User Methods ---
     def register_user(self, username, password, role):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+                           (username, password, role))
+            conn.commit()
+        except sqlite3.IntegrityError:
+            raise Exception("Username already exists")
+        finally:
+            conn.close()
 
-        user = User(username, password, role)
-        user_id = user.save(self.connection)
-        return user_id
-    
     def authenticate_user(self, username, password):
-
-        password_hash = hashlib.sha256(password.encode()).hexdigest()
-        cursor = self.connection.cursor()
-        cursor.execute('SELECT * FROM users WHERE username = ? AND password = ?', (username, password_hash))
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
         user = cursor.fetchone()
+        conn.close()
         return dict(user) if user else None
-    
+
     def get_user_by_username(self, username):
-        cursor = self.connection.cursor()
-        cursor.execute('SELECT * FROM users WHERE username = ?', (username,))
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE username=?", (username,))
         user = cursor.fetchone()
+        conn.close()
         return dict(user) if user else None
-    
-    def add_book(self, title, author, isbn, quantity):
 
-        book = Book(title, author, isbn, quantity)
-        book_id = book.save(self.connection)
-        return book_id
-    
+    # --- Book Methods ---
     def get_all_books(self):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM books")
+        books = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return books
 
-        cursor = self.connection.cursor()
-        cursor.execute('SELECT * FROM books ORDER BY title ASC')
-        return [dict(row) for row in cursor.fetchall()]
-    
-    def get_book_by_id(self, book_id):
+    def add_book(self, title, author, isbn, quantity):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''INSERT INTO books (title, author, isbn, quantity, available_quantity)
+                          VALUES (?, ?, ?, ?, ?)''', (title, author, isbn, quantity, quantity))
+        conn.commit()
+        conn.close()
 
-        cursor = self.connection.cursor()
-        cursor.execute('SELECT * FROM books WHERE book_id = ?', (book_id,))
-        book = cursor.fetchone()
-        return dict(book) if book else None
-    
-    def search_books(self, search_term):
-
-        cursor = self.connection.cursor()
-        cursor.execute('''
-            SELECT * FROM books 
-            WHERE title LIKE ? OR author LIKE ? OR isbn LIKE ?
-            ORDER BY title ASC
-        ''', (f'%{search_term}%', f'%{search_term}%', f'%{search_term}%'))
-        return [dict(row) for row in cursor.fetchall()]
-    
-    def borrow_book(self, user_id, book_id):
-        cursor = self.connection.cursor()
-        
-        # Check availability
-        cursor.execute('SELECT available_quantity FROM books WHERE book_id = ?', (book_id,))
-        result = cursor.fetchone()
-        
-        if not result or result['available_quantity'] <= 0:
-            raise Exception("Book not available")
-        
-        # Create transaction
-        transaction = Transaction(user_id, book_id, 'borrow')
-        transaction.save(self.connection)
-        
-        # Update available quantity
-        cursor.execute('''
-            UPDATE books SET available_quantity = available_quantity - 1 WHERE book_id = ?
-        ''', (book_id,))
-        self.connection.commit()
-    
-    def return_book(self, user_id, book_id):
-        cursor = self.connection.cursor()
-        
-        # Verify user borrowed this book
-        cursor.execute('''
-            SELECT * FROM transactions 
-            WHERE user_id = ? AND book_id = ? AND transaction_type = 'borrow'
-            ORDER BY transaction_date DESC LIMIT 1
-        ''', (user_id, book_id))
-        
-        borrow_record = cursor.fetchone()
-        if not borrow_record:
-            raise Exception("No active borrow record found")
-        
-        # Create return transaction
-        transaction = Transaction(user_id, book_id, 'return')
-        transaction.save(self.connection)
-        
-        # Update available quantity
-        cursor.execute('''
-            UPDATE books SET available_quantity = available_quantity + 1 WHERE book_id = ?
-        ''', (book_id,))
-        self.connection.commit()
-    
-    def get_user_borrowed_books(self, user_id):
-        cursor = self.connection.cursor()
-        cursor.execute('''
-            SELECT DISTINCT b.*, t.transaction_date, t.due_date
-            FROM books b
-            JOIN transactions t ON b.book_id = t.book_id
-            WHERE t.user_id = ? AND t.transaction_type = 'borrow'
-            AND NOT EXISTS (
-                SELECT 1 FROM transactions t2 
-                WHERE t2.user_id = ? AND t2.book_id = b.book_id 
-                AND t2.transaction_type = 'return'
-                AND t2.transaction_date > t.transaction_date
-            )
-        ''', (user_id, user_id))
-        return [dict(row) for row in cursor.fetchall()]
-    
-    def get_all_transactions(self):
-        cursor = self.connection.cursor()
-        cursor.execute('''
-            SELECT t.*, u.username, b.title 
-            FROM transactions t
-            JOIN users u ON t.user_id = u.user_id
-            JOIN books b ON t.book_id = b.book_id
-            ORDER BY t.transaction_date DESC
-        ''')
-        return [dict(row) for row in cursor.fetchall()]
-    
-    def delete_book(self, book_id):
-        cursor = self.connection.cursor()
-        cursor.execute('DELETE FROM books WHERE book_id = ?', (book_id,))
-        self.connection.commit()
-    
     def update_book(self, book_id, title, author, isbn, quantity):
-        cursor = self.connection.cursor()
-        cursor.execute('''
-            UPDATE books 
-            SET title = ?, author = ?, isbn = ?, quantity = ?
-            WHERE book_id = ?
-        ''', (title, author, isbn, quantity, book_id))
-        self.connection.commit()
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT quantity, available_quantity FROM books WHERE book_id=?", (book_id,))
+        row = cursor.fetchone()
+        if row:
+            diff = quantity - row['quantity']
+            new_avail = row['available_quantity'] + diff
+            cursor.execute('''UPDATE books SET title=?, author=?, isbn=?, quantity=?, available_quantity=?
+                              WHERE book_id=?''', (title, author, isbn, quantity, new_avail, book_id))
+        conn.commit()
+        conn.close()
+
+    def delete_book(self, book_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM books WHERE book_id=?", (book_id,))
+        conn.commit()
+        conn.close()
+
+    # --- Standard Transactions ---
+    def get_all_transactions(self):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''SELECT t.transaction_id, u.username, b.title, t.transaction_type, t.transaction_date, t.due_date
+                          FROM transactions t
+                          JOIN users u ON t.user_id = u.user_id
+                          JOIN books b ON t.book_id = b.book_id
+                          ORDER BY t.transaction_date DESC''')
+        trans = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return trans
+
+    def get_user_borrowed_books(self, user_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''SELECT t.transaction_id, b.title, t.transaction_date, t.due_date, b.book_id, t.transaction_type
+                          FROM transactions t
+                          JOIN books b ON t.book_id = b.book_id
+                          WHERE t.user_id=? AND t.status='Active' ''', (user_id,))
+        books = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return books
+
+    # --- NEW: Request, Approve, Return Logic ---
+    def request_books(self, user_id, cart_items):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for item in cart_items:
+            cursor.execute('''INSERT INTO transactions (user_id, book_id, transaction_type, transaction_date, status)
+                              VALUES (?, ?, ?, ?, 'Pending')''',
+                           (user_id, item['book_id'], f"{item['qty']}", date_now))
+        conn.commit()
+        conn.close()
+
+    def get_pending_requests(self):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''SELECT t.transaction_id, u.username, b.title, t.transaction_type as qty_requested, t.transaction_date, t.book_id, t.user_id
+                          FROM transactions t
+                          JOIN users u ON t.user_id = u.user_id
+                          JOIN books b ON t.book_id = b.book_id
+                          WHERE t.status = 'Pending' ''')
+        reqs = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return reqs
+
+    def admin_approve_request(self, transaction_id, user_id, book_id, qty_requested):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        due_date = (datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d")
+
+        try:
+            qty = int(qty_requested)
+        except ValueError:
+            qty = 1
+
+        # 1. Update original to Approved
+        cursor.execute("UPDATE transactions SET status='Approved' WHERE transaction_id=?", (transaction_id,))
+
+        # 2. Create new Active checkout
+        cursor.execute('''INSERT INTO transactions (user_id, book_id, transaction_type, transaction_date, due_date, status)
+                          VALUES (?, ?, ?, ?, ?, 'Active')''',
+                       (user_id, book_id, str(qty), date_now, due_date))
+
+        # 3. Deduct inventory
+        cursor.execute("UPDATE books SET available_quantity = available_quantity - ? WHERE book_id=?", (qty, book_id))
+
+        conn.commit()
+        conn.close()
+
+    def return_book(self, transaction_id, book_id, quantity_str):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            qty = int(quantity_str)
+        except ValueError:
+            qty = 1
+
+        cursor.execute("UPDATE transactions SET status='Returned' WHERE transaction_id=?", (transaction_id,))
+        cursor.execute("UPDATE books SET available_quantity = available_quantity + ? WHERE book_id=?", (qty, book_id))
+
+        conn.commit()
+        conn.close()
