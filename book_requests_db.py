@@ -1,0 +1,134 @@
+import sqlite3
+from datetime import datetime
+
+# Using a test DB name so it doesn't mess with your main library.db yet
+DB_NAME = "test_library_requests.db"
+
+
+def init_test_db():
+    """Sets up a test database with books and transactions tables."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    # Mock Books Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS books (
+            ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            Title TEXT,
+            Available INTEGER
+        )
+    ''')
+
+    # Transactions Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            book_id INTEGER,
+            quantity INTEGER,
+            status TEXT,
+            date TEXT
+        )
+    ''')
+
+    # Seed some dummy books if the table is empty
+    cursor.execute("SELECT COUNT(*) FROM books")
+    if cursor.fetchone()[0] == 0:
+        cursor.executemany("INSERT INTO books (Title, Available) VALUES (?, ?)", [
+            ("AutoCAD 2023 Instructor", 10),
+            ("Introduction to Algorithms", 4),
+            ("Principle of Solid Mechanics", 67)
+        ])
+
+    conn.commit()
+    conn.close()
+
+
+def get_all_books():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT ID, Title, Available FROM books")
+    books = cursor.fetchall()
+    conn.close()
+    return books
+
+
+def request_books(user_id, cart_items):
+    """Adds books as 'Pending' for the admin to review."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    date_requested = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    for item in cart_items:
+        cursor.execute("""
+            INSERT INTO transactions (user_id, book_id, quantity, status, date) 
+            VALUES (?, ?, ?, 'Pending', ?)
+        """, (user_id, item['book_id'], item['qty'], date_requested))
+
+    conn.commit()
+    conn.close()
+
+
+def get_pending_requests():
+    """Fetches all pending requests for the admin."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT t.id, t.user_id, b.Title, t.quantity, t.date, t.book_id
+        FROM transactions t
+        JOIN books b ON t.book_id = b.ID
+        WHERE t.status = 'Pending'
+    """)
+    requests = cursor.fetchall()
+    conn.close()
+    return requests
+
+
+def admin_approve_request(transaction_id, user_id, book_id, quantity):
+    """Updates Pending to Approved, creates Active, and deducts inventory."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    try:
+        cursor.execute("UPDATE transactions SET status = 'Approved' WHERE id = ?", (transaction_id,))
+        cursor.execute("""
+            INSERT INTO transactions (user_id, book_id, quantity, status, date) 
+            VALUES (?, ?, ?, 'Active', ?)
+        """, (user_id, book_id, quantity, date_now))
+        cursor.execute("UPDATE books SET Available = Available - ? WHERE ID = ?", (quantity, book_id))
+        conn.commit()
+    except Exception as e:
+        print(f"Database error: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+
+def get_active_transactions(user_id):
+    """Fetches active checkouts for a specific user to return."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT t.id, b.Title, t.quantity, t.date, t.book_id
+        FROM transactions t
+        JOIN books b ON t.book_id = b.ID
+        WHERE t.status = 'Active' AND t.user_id = ?
+    """, (user_id,))
+    transactions = cursor.fetchall()
+    conn.close()
+    return transactions
+
+
+def return_book(transaction_id, book_id, quantity):
+    """Marks an Active transaction as Returned and restores inventory."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE transactions SET status = 'Returned' WHERE id = ?", (transaction_id,))
+    cursor.execute("UPDATE books SET Available = Available + ? WHERE ID = ?", (quantity, book_id))
+    conn.commit()
+    conn.close()
+
+
+# Initialize the test database when this file is imported
+init_test_db()
