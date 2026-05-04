@@ -549,37 +549,34 @@ class AdminDashboard:
         # Open the scanner window and pass the callback function
         BarcodeScannerWindow(self.root, self.handle_scanned_barcode)
 
-        # --- Scanner Methods ---
-        def open_scanner(self):
-            # Open the scanner window and pass the callback function
-            BarcodeScannerWindow(self.root, self.handle_scanned_barcode)
-
-        def handle_scanned_barcode(self, scanned_isbn):
-            # 1. Catch the "X" (Failed/Blurry Scan) or empty scans
-            if scanned_isbn == "X" or not scanned_isbn:
-                messagebox.showerror(
-                    "Scan Error",
-                    "The scanner couldn't read the barcode clearly. Please check the focus and lighting, then try again."
-                )
-                return  # Stop execution here
+    def handle_scanned_barcode(self, scanned_isbn):
+        # 1. Catch the "X" (Failed/Blurry Scan) or empty scans
+        if scanned_isbn == "X" or not scanned_isbn:
+            # We use root.after to delay the messagebox, ensuring the camera window fully closes first.
+            self.root.after(100, lambda: messagebox.showerror(
+                "Scan Error",
+                "The scanner couldn't read the barcode clearly. Please check the focus and lighting, then try again."
+            ))
+            return
 
             # 2. Find the book with this ISBN in the treeview
-            found = False
-            for item in self.books_tree.get_children():
-                values = self.books_tree.item(item, 'values')
-                if len(values) >= 4 and values[3] == scanned_isbn:
-                    # Select the item, focus it, and scroll to it
-                    self.books_tree.selection_set(item)
-                    self.books_tree.focus(item)
-                    self.books_tree.see(item)
-                    found = True
+        found = False
+        for item in self.books_tree.get_children():
+            values = self.books_tree.item(item, 'values')
+            if len(values) >= 4 and values[3] == scanned_isbn:
+                # Select the item, focus it, and scroll to it
+                self.books_tree.selection_set(item)
+                self.books_tree.focus(item)
+                self.books_tree.see(item)
+                found = True
 
-                    # Show success message
-                    messagebox.showinfo("Scanner Success", f"Found book: {values[1]}")
-                    break
+                # Delay success message
+                self.root.after(100, lambda: messagebox.showinfo("Scanner Success", f"Found book: {values[1]}"))
+                break
 
-            # 3. Handle New Books not found in the system
-            if not found:
+        # 3. Handle New Books not found in the system
+        if not found:
+            def ask_to_add():
                 user_wants_to_add = messagebox.askyesno(
                     "New Book Detected",
                     f"Scanned ISBN: {scanned_isbn}\n\nThis book isn't in your system yet. Would you like to add it now?"
@@ -587,73 +584,10 @@ class AdminDashboard:
                 if user_wants_to_add:
                     self.add_book(prefill_isbn=scanned_isbn)
 
-        # --- End Scanner Methods ---
+            # Delay the prompt so the camera can close without freezing Tkinter
+            self.root.after(100, ask_to_add)
 
-        def add_book(self, prefill_isbn=""):
-            add_window = tk.Toplevel(self.root)
-            add_window.title("Add New Book")
-            add_window.geometry("400x350")
-            add_window.configure(bg=self.SECONDARY_COLOR)
-
-            tk.Label(add_window, text="Title:", font=("Helvetica", 11),
-                     fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(20, 5))
-            title_entry = tk.Entry(add_window, font=("Helvetica", 10), width=40)
-            title_entry.pack(pady=(0, 10))
-
-            tk.Label(add_window, text="Author:", font=("Helvetica", 11),
-                     fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
-            author_entry = tk.Entry(add_window, font=("Helvetica", 10), width=40)
-            author_entry.pack(pady=(0, 10))
-
-            tk.Label(add_window, text="ISBN:", font=("Helvetica", 11),
-                     fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
-            isbn_entry = tk.Entry(add_window, font=("Helvetica", 10), width=40)
-
-            # Insert the scanned ISBN automatically if it was passed to the function
-            if prefill_isbn:
-                isbn_entry.insert(0, prefill_isbn)
-
-            isbn_entry.pack(pady=(0, 10))
-
-            tk.Label(add_window, text="Quantity:", font=("Helvetica", 11),
-                     fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
-            quantity_entry = tk.Entry(add_window, font=("Helvetica", 10), width=40)
-            quantity_entry.pack(pady=(0, 20))
-
-            def save_book():
-                title = title_entry.get()
-                author = author_entry.get()
-                isbn = isbn_entry.get()
-                quantity = quantity_entry.get()
-
-                if not all([title, author, isbn, quantity]):
-                    messagebox.showerror("Error", "Please fill all fields")
-                    return
-
-                try:
-                    quantity = int(quantity)
-                    self.db_manager.add_book(title, author, isbn, quantity)
-                    messagebox.showinfo("Success", "Book added successfully!")
-                    self.load_books()
-                    add_window.destroy()
-                except ValueError:
-                    messagebox.showerror("Error", "Quantity must be a number")
-                except Exception as e:
-                    messagebox.showerror("Error", str(e))
-
-            save_btn = tk.Button(
-                add_window,
-                text="SAVE BOOK",
-                font=("Helvetica", 11, "bold"),
-                bg=self.PRIMARY_COLOR,
-                fg=self.SECONDARY_COLOR,
-                command=save_book,
-                relief=tk.FLAT,
-                cursor="hand2",
-                padx=20,
-                pady=10
-            )
-            save_btn.pack(pady=20)
+    # --- End Scanner Methods ---
 
     def setup_book_status_tab(self):
         # Status display
@@ -807,7 +741,7 @@ class AdminDashboard:
                 book['available_quantity']
             ))
 
-    def add_book(self):
+    def add_book(self, prefill_isbn=""):
         add_window = tk.Toplevel(self.root)
         add_window.title("Add New Book")
         add_window.geometry("400x350")
@@ -826,6 +760,10 @@ class AdminDashboard:
         tk.Label(add_window, text="ISBN:", font=("Helvetica", 11),
                  fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
         isbn_entry = tk.Entry(add_window, font=("Helvetica", 10), width=40)
+
+        if prefill_isbn:
+            isbn_entry.insert(0, prefill_isbn)
+
         isbn_entry.pack(pady=(0, 10))
 
         tk.Label(add_window, text="Quantity:", font=("Helvetica", 11),

@@ -1,67 +1,78 @@
 import cv2
+import numpy as np
 from pyzbar.pyzbar import decode
-import tkinter as tk
-from PIL import Image, ImageTk
-
+import threading
 
 class BarcodeScannerWindow:
-    def __init__(self, parent, on_scan_callback):
-        self.top = tk.Toplevel(parent)
-        self.top.title("📷 Scan Barcode")
-        self.top.geometry("640x480")
-        self.top.configure(bg="#1E1E1E")
-        self.top.resizable(False, False)
+    def __init__(self, parent, callback):
+        self.parent = parent
+        self.callback = callback
 
-        # The function to run when a barcode is found
-        self.on_scan_callback = on_scan_callback
+        # We run the scanner in a separate thread so it doesn't freeze your Tkinter UI
+        self.scan_thread = threading.Thread(target=self.run_scanner)
+        self.scan_thread.daemon = True
+        self.scan_thread.start()
 
-        # Open the default webcam (0)
-        self.vid = cv2.VideoCapture(0)
+    def run_scanner(self):
+        # 1. Open camera with DirectShow for better Windows performance
+        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
-        # Canvas to hold the live video stream
-        self.canvas = tk.Canvas(self.top, width=640, height=480, bg="#000000", highlightthickness=0)
-        self.canvas.pack(fill=tk.BOTH, expand=True)
+        # 2. FORCE 1080p (1920x1080)
+        # If your webcam only supports 720p, it will automatically scale to its max
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
 
-        # Start the video loop
-        self.update_frame()
+        scanned_isbn = None
 
-        # Handle the user clicking the 'X' button gracefully
-        self.top.protocol("WM_DELETE_WINDOW", self.on_close)
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                continue
 
-    def update_frame(self):
-        ret, frame = self.vid.read()
-        if ret:
-            # 1. Look for barcodes in the current frame
-            barcodes = decode(frame)
+            # Convert the frame to grayscale for the decoder (removes visual noise/grain)
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+            # Look for barcodes in the CLEAN grayscale frame
+            barcodes = decode(gray_frame)
+
             for barcode in barcodes:
-                # We found one! Extract the text
-                barcode_data = barcode.data.decode('utf-8')
+                # Decode the raw barcode data to a string
+                raw_data = barcode.data.decode('utf-8')
 
-                # Trigger the callback with the scanned data
-                self.on_scan_callback(barcode_data)
+                # Clean the data just in case it brings in hyphens
+                clean_data = raw_data.replace("-", "")
 
-                # Cleanup and close the scanner window
-                self.on_close()
-                return
+                # FILTER: Only accept standard ISBN lengths (10 or 13 digits)
+                if len(clean_data) == 13 or len(clean_data) == 10:
+                    scanned_isbn = clean_data
 
-            # 2. If no barcode, convert the OpenCV frame (BGR) to Tkinter format (RGB)
-            cv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            pil_image = Image.fromarray(cv_image)
-            self.photo = ImageTk.PhotoImage(image=pil_image)
+                    # Draw a green box around the detected barcode on the ORIGINAL COLOR frame
+                    (x, y, w, h) = barcode.rect
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                    break  # We found a valid ISBN, stop scanning!
+                else:
+                    # It's a partial read or a price code. Ignore it and keep looking.
+                    continue
 
-            # 3. Draw it on the canvas
-            self.canvas.create_image(0, 0, image=self.photo, anchor=tk.NW)
+            # Display the NORMAL color video feed to the user
+            cv2.imshow("Barcode Scanner - Press 'Q' or 'ESC' to Cancel", frame)
 
-        # Loop this function every 15ms
-        self.update_job = self.top.after(15, self.update_frame)
+            # Check if we successfully scanned something, OR if the user pressed Q/ESC to quit
+            key = cv2.waitKey(1) & 0xFF
+            if scanned_isbn or key == ord('q') or key == 27:
+                break
 
-    def on_close(self):
-        # Stop the after() loop to prevent errors
-        if hasattr(self, 'update_job'):
-            self.top.after_cancel(self.update_job)
+            # Check if the user clicked the "X" button on the window to close it
+            if cv2.getWindowProperty("Barcode Scanner - Press 'Q' or 'ESC' to Cancel", cv2.WND_PROP_VISIBLE) < 1:
+                break
 
-        # Release the webcam
-        if self.vid.isOpened():
-            self.vid.release()
+        # 4. Clean up the camera resources
+        cap.release()
+        cv2.destroyAllWindows()
 
-        self.top.destroy()
+        # 5. Send the result back to your ui.py file
+        if scanned_isbn:
+            self.callback(scanned_isbn)
+        else:
+            # Return "X" if the user closed the window without scanning anything
+            self.callback("X")
