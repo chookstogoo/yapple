@@ -365,3 +365,8 @@ class LibraryManagementApp:
             StudentDashboard(self.root, user_data, self.db_manager, self.show_login_window)
         elif user_data['role'].lower() == 'admin':
             AdminDashboard(self.root, user_data, self.db_manager, self.show_login_window)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = LibraryManagementApp(root)
+    root.mainloop()
