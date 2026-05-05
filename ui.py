@@ -3,36 +3,31 @@ from tkinter import ttk, messagebox, simpledialog
 import hashlib
 from PIL import Image, ImageTk
 
-# Import your non-UI logic and external scanner/generator tools
 from database import DatabaseManager
 from barcode_scanner import BarcodeScannerWindow
 from barcode_generator import BarcodeGenerator
 
 
 class LoginWindow:
-
     def __init__(self, root, on_login_callback, db_manager):
         self.root = root
         self.on_login_callback = on_login_callback
         self.db_manager = db_manager
 
-        # Colors
-        self.PRIMARY_COLOR = "#DC143C"  # Crimson Red
-        self.SECONDARY_COLOR = "#FFFFFF"  # White
+        # Light Theme Colors
+        self.PRIMARY_COLOR = "#DC143C"
+        self.SECONDARY_COLOR = "#FFFFFF"
         self.TEXT_COLOR = "#333333"
         self.LIGHT_GRAY = "#F5F5F5"
         self.ACCENT_GRAY = "#999999"
-        self.BORDER_COLOR = "#E0E0E0"
 
-        self.current_mode = "login"  # Track current mode
+        self.current_mode = "login"
 
-        # --- IMAGE LOADING ---
         try:
-            # Matches your specific filename exactly
             self.original_image = Image.open("image (37).png")
         except FileNotFoundError:
             self.original_image = None
-            print("Warning: image (37).png not found in the finaleproject folder.")
+
         self.setup_ui()
 
     def resize_image(self, event):
@@ -372,14 +367,13 @@ class LoginWindow:
 
 
 class AdminDashboard:
-
     def __init__(self, root, user_data, db_manager, logout_callback):
         self.root = root
         self.user_data = user_data
         self.db_manager = db_manager
         self.logout_callback = logout_callback
 
-        # Colors (Light Mode)
+        # Light Theme Colors
         self.PRIMARY_COLOR = "#DC143C"
         self.SECONDARY_COLOR = "#FFFFFF"
         self.TEXT_COLOR = "#333333"
@@ -390,7 +384,6 @@ class AdminDashboard:
     def setup_ui(self):
         self.root.configure(bg=self.SECONDARY_COLOR)
 
-        # Header
         header = tk.Frame(self.root, bg=self.PRIMARY_COLOR, height=80)
         header.pack(fill=tk.X)
         header.pack_propagate(False)
@@ -418,106 +411,55 @@ class AdminDashboard:
         )
         logout_btn.pack(side=tk.RIGHT, padx=20, pady=20)
 
-        # Main content with tabs
         content = tk.Frame(self.root, bg=self.SECONDARY_COLOR)
         content.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
 
         notebook = ttk.Notebook(content)
         notebook.pack(fill=tk.BOTH, expand=True)
 
-        # Tab 1: Book Management
         self.book_tab = tk.Frame(notebook, bg=self.SECONDARY_COLOR)
         notebook.add(self.book_tab, text="📚 Book Management")
         self.setup_book_management_tab()
 
-        # Tab 2: Book Status
         self.status_tab = tk.Frame(notebook, bg=self.SECONDARY_COLOR)
         notebook.add(self.status_tab, text="📊 Book Status")
         self.setup_book_status_tab()
 
-        # Tab 3: Transactions
         self.transaction_tab = tk.Frame(notebook, bg=self.SECONDARY_COLOR)
         notebook.add(self.transaction_tab, text="📋 Transactions")
         self.setup_transactions_tab()
 
-        # Tab 4: Pending Book Requests
         self.requests_tab = tk.Frame(notebook, bg=self.SECONDARY_COLOR)
         notebook.add(self.requests_tab, text="🔔 Pending Requests")
         self.setup_requests_tab()
 
     def setup_book_management_tab(self):
-        # Button frame
         button_frame = tk.Frame(self.book_tab, bg=self.ACCENT_COLOR, relief=tk.RAISED, bd=2)
         button_frame.pack(fill=tk.X, padx=20, pady=20)
 
-        add_btn = tk.Button(
-            button_frame,
-            text="➕ ADD NEW BOOK",
-            font=("Helvetica", 11, "bold"),
-            bg=self.PRIMARY_COLOR,
-            fg=self.SECONDARY_COLOR,
-            command=self.add_book,
-            relief=tk.FLAT,
-            cursor="hand2",
-            padx=15,
-            pady=8
-        )
+        add_btn = tk.Button(button_frame, text="➕ ADD NEW BOOK", font=("Helvetica", 11, "bold"), bg=self.PRIMARY_COLOR,
+                            fg=self.SECONDARY_COLOR, command=self.add_book, relief=tk.FLAT, cursor="hand2", padx=15,
+                            pady=8)
         add_btn.pack(side=tk.LEFT, padx=5)
 
-        delete_btn = tk.Button(
-            button_frame,
-            text="🗑️ DELETE BOOK",
-            font=("Helvetica", 11, "bold"),
-            bg="#DC3545",
-            fg=self.SECONDARY_COLOR,
-            command=self.delete_book,
-            relief=tk.FLAT,
-            cursor="hand2",
-            padx=15,
-            pady=8
-        )
+        delete_btn = tk.Button(button_frame, text="🗑️ DELETE BOOK", font=("Helvetica", 11, "bold"), bg="#DC3545",
+                               fg=self.SECONDARY_COLOR, command=self.delete_book, relief=tk.FLAT, cursor="hand2",
+                               padx=15, pady=8)
         delete_btn.pack(side=tk.LEFT, padx=5)
 
-        update_btn = tk.Button(
-            button_frame,
-            text="✏️ UPDATE BOOK",
-            font=("Helvetica", 11, "bold"),
-            bg="#FFC107",
-            fg=self.TEXT_COLOR,
-            command=self.update_book,
-            relief=tk.FLAT,
-            cursor="hand2",
-            padx=15,
-            pady=8
-        )
+        update_btn = tk.Button(button_frame, text="✏️ UPDATE BOOK", font=("Helvetica", 11, "bold"), bg="#FFC107",
+                               fg=self.TEXT_COLOR, command=self.update_book, relief=tk.FLAT, cursor="hand2", padx=15,
+                               pady=8)
         update_btn.pack(side=tk.LEFT, padx=5)
 
-        refresh_btn = tk.Button(
-            button_frame,
-            text="🔄 REFRESH",
-            font=("Helvetica", 11, "bold"),
-            bg="#28A745",
-            fg=self.SECONDARY_COLOR,
-            command=self.load_books,
-            relief=tk.FLAT,
-            cursor="hand2",
-            padx=15,
-            pady=8
-        )
+        refresh_btn = tk.Button(button_frame, text="🔄 REFRESH", font=("Helvetica", 11, "bold"), bg="#28A745",
+                                fg=self.SECONDARY_COLOR, command=self.load_books, relief=tk.FLAT, cursor="hand2",
+                                padx=15, pady=8)
         refresh_btn.pack(side=tk.LEFT, padx=5)
 
-        scan_btn = tk.Button(
-            button_frame,
-            text="📷 SCAN BOOK",
-            font=("Helvetica", 11, "bold"),
-            bg="#17A2B8",
-            fg=self.SECONDARY_COLOR,
-            command=self.open_scanner,
-            relief=tk.FLAT,
-            cursor="hand2",
-            padx=15,
-            pady=8
-        )
+        scan_btn = tk.Button(button_frame, text="📷 SCAN BOOK", font=("Helvetica", 11, "bold"), bg="#17A2B8",
+                             fg=self.SECONDARY_COLOR, command=self.open_scanner, relief=tk.FLAT, cursor="hand2",
+                             padx=15, pady=8)
         scan_btn.pack(side=tk.LEFT, padx=5)
 
         tree_frame = tk.Frame(self.book_tab, bg=self.SECONDARY_COLOR)
@@ -580,53 +522,29 @@ class AdminDashboard:
         status_frame = tk.Frame(self.status_tab, bg=self.SECONDARY_COLOR)
         status_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
-        tk.Label(status_frame, text="📊 LIBRARY STATISTICS", font=("Helvetica", 14, "bold"),
-                 fg=self.PRIMARY_COLOR, bg=self.SECONDARY_COLOR).pack(anchor=tk.W, pady=(0, 20))
+        tk.Label(status_frame, text="📊 LIBRARY STATISTICS", font=("Helvetica", 14, "bold"), fg=self.PRIMARY_COLOR,
+                 bg=self.SECONDARY_COLOR).pack(anchor=tk.W, pady=(0, 20))
 
         stats_container = tk.Frame(status_frame, bg=self.SECONDARY_COLOR)
         stats_container.pack(fill=tk.X, pady=10)
 
-        self.total_books_label = tk.Label(
-            stats_container,
-            text="Total Books: 0",
-            font=("Helvetica", 12, "bold"),
-            fg=self.SECONDARY_COLOR,
-            bg=self.PRIMARY_COLOR,
-            padx=20,
-            pady=20,
-            relief=tk.RAISED,
-            bd=2
-        )
+        self.total_books_label = tk.Label(stats_container, text="Total Books: 0", font=("Helvetica", 12, "bold"),
+                                          fg=self.SECONDARY_COLOR, bg=self.PRIMARY_COLOR, padx=20, pady=20,
+                                          relief=tk.RAISED, bd=2)
         self.total_books_label.pack(side=tk.LEFT, padx=10, fill=tk.BOTH, expand=True)
 
-        self.available_books_label = tk.Label(
-            stats_container,
-            text="Available Books: 0",
-            font=("Helvetica", 12, "bold"),
-            fg=self.SECONDARY_COLOR,
-            bg="#28A745",
-            padx=20,
-            pady=20,
-            relief=tk.RAISED,
-            bd=2
-        )
+        self.available_books_label = tk.Label(stats_container, text="Available Books: 0",
+                                              font=("Helvetica", 12, "bold"), fg=self.SECONDARY_COLOR, bg="#28A745",
+                                              padx=20, pady=20, relief=tk.RAISED, bd=2)
         self.available_books_label.pack(side=tk.LEFT, padx=10, fill=tk.BOTH, expand=True)
 
-        self.borrowed_books_label = tk.Label(
-            stats_container,
-            text="Borrowed Books: 0",
-            font=("Helvetica", 12, "bold"),
-            fg=self.SECONDARY_COLOR,
-            bg="#007BFF",
-            padx=20,
-            pady=20,
-            relief=tk.RAISED,
-            bd=2
-        )
+        self.borrowed_books_label = tk.Label(stats_container, text="Borrowed Books: 0", font=("Helvetica", 12, "bold"),
+                                             fg=self.SECONDARY_COLOR, bg="#007BFF", padx=20, pady=20, relief=tk.RAISED,
+                                             bd=2)
         self.borrowed_books_label.pack(side=tk.LEFT, padx=10, fill=tk.BOTH, expand=True)
 
-        tk.Label(status_frame, text="\n📖 Individual Book Status:", font=("Helvetica", 12, "bold"),
-                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(anchor=tk.W, pady=(20, 10))
+        tk.Label(status_frame, text="\n📖 Individual Book Status:", font=("Helvetica", 12, "bold"), fg=self.TEXT_COLOR,
+                 bg=self.SECONDARY_COLOR).pack(anchor=tk.W, pady=(20, 10))
 
         tree_frame = tk.Frame(status_frame, bg=self.SECONDARY_COLOR)
         tree_frame.pack(fill=tk.BOTH, expand=True)
@@ -647,18 +565,9 @@ class AdminDashboard:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.status_tree.configure(yscroll=scrollbar.set)
 
-        refresh_btn = tk.Button(
-            status_frame,
-            text="🔄 REFRESH STATS",
-            font=("Helvetica", 11, "bold"),
-            bg=self.PRIMARY_COLOR,
-            fg=self.SECONDARY_COLOR,
-            command=self.load_book_status,
-            relief=tk.FLAT,
-            cursor="hand2",
-            padx=15,
-            pady=8
-        )
+        refresh_btn = tk.Button(status_frame, text="🔄 REFRESH STATS", font=("Helvetica", 11, "bold"),
+                                bg=self.PRIMARY_COLOR, fg=self.SECONDARY_COLOR, command=self.load_book_status,
+                                relief=tk.FLAT, cursor="hand2", padx=15, pady=8)
         refresh_btn.pack(pady=(20, 0))
 
         self.load_book_status()
@@ -667,18 +576,9 @@ class AdminDashboard:
         button_frame = tk.Frame(self.transaction_tab, bg=self.ACCENT_COLOR, relief=tk.RAISED, bd=2)
         button_frame.pack(fill=tk.X, padx=20, pady=20)
 
-        refresh_btn = tk.Button(
-            button_frame,
-            text="🔄 REFRESH TRANSACTIONS",
-            font=("Helvetica", 11, "bold"),
-            bg=self.PRIMARY_COLOR,
-            fg=self.SECONDARY_COLOR,
-            command=self.load_transactions,
-            relief=tk.FLAT,
-            cursor="hand2",
-            padx=15,
-            pady=8
-        )
+        refresh_btn = tk.Button(button_frame, text="🔄 REFRESH TRANSACTIONS", font=("Helvetica", 11, "bold"),
+                                bg=self.PRIMARY_COLOR, fg=self.SECONDARY_COLOR, command=self.load_transactions,
+                                relief=tk.FLAT, cursor="hand2", padx=15, pady=8)
         refresh_btn.pack(side=tk.LEFT, padx=5)
 
         tree_frame = tk.Frame(self.transaction_tab, bg=self.SECONDARY_COLOR)
@@ -749,28 +649,21 @@ class AdminDashboard:
 
         for book in books:
             self.books_tree.insert('', tk.END, values=(
-                book['book_id'],
-                book['title'],
-                book['author'],
-                book['isbn'],
-                book['quantity'],
-                book['available_quantity']
+                book['book_id'], book['title'], book['author'],
+                book['isbn'], book['quantity'], book['available_quantity']
             ))
 
     def load_requests(self):
-        # Refresh the tree view with pending requests
         for item in self.requests_tree.get_children():
             self.requests_tree.delete(item)
 
         try:
-            # Assumes a function in your db_manager that fetches pending requests
             requests = self.db_manager.get_pending_requests()
             for req in requests:
                 self.requests_tree.insert('', tk.END, values=(
                     req['request_id'], req['username'], req['title'], req['qty'], req['status']
                 ))
-        except AttributeError:
-            # Fail gracefully if db function doesn't exist yet
+        except Exception as e:
             pass
 
     def approve_request(self):
@@ -809,18 +702,18 @@ class AdminDashboard:
         add_window.geometry("400x350")
         add_window.configure(bg=self.SECONDARY_COLOR)
 
-        tk.Label(add_window, text="Title:", font=("Helvetica", 11),
-                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(20, 5))
+        tk.Label(add_window, text="Title:", font=("Helvetica", 11), fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(
+            pady=(20, 5))
         title_entry = tk.Entry(add_window, font=("Helvetica", 10), width=40)
         title_entry.pack(pady=(0, 10))
 
-        tk.Label(add_window, text="Author:", font=("Helvetica", 11),
-                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
+        tk.Label(add_window, text="Author:", font=("Helvetica", 11), fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(
+            pady=(10, 5))
         author_entry = tk.Entry(add_window, font=("Helvetica", 10), width=40)
         author_entry.pack(pady=(0, 10))
 
-        tk.Label(add_window, text="ISBN:", font=("Helvetica", 11),
-                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
+        tk.Label(add_window, text="ISBN:", font=("Helvetica", 11), fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(
+            pady=(10, 5))
         isbn_entry = tk.Entry(add_window, font=("Helvetica", 10), width=40)
 
         if prefill_isbn:
@@ -828,8 +721,8 @@ class AdminDashboard:
 
         isbn_entry.pack(pady=(0, 10))
 
-        tk.Label(add_window, text="Quantity:", font=("Helvetica", 11),
-                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
+        tk.Label(add_window, text="Quantity:", font=("Helvetica", 11), fg=self.TEXT_COLOR,
+                 bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
         quantity_entry = tk.Entry(add_window, font=("Helvetica", 10), width=40)
         quantity_entry.pack(pady=(0, 20))
 
@@ -854,18 +747,9 @@ class AdminDashboard:
             except Exception as e:
                 messagebox.showerror("Error", str(e))
 
-        save_btn = tk.Button(
-            add_window,
-            text="SAVE BOOK",
-            font=("Helvetica", 11, "bold"),
-            bg=self.PRIMARY_COLOR,
-            fg=self.SECONDARY_COLOR,
-            command=save_book,
-            relief=tk.FLAT,
-            cursor="hand2",
-            padx=20,
-            pady=10
-        )
+        save_btn = tk.Button(add_window, text="SAVE BOOK", font=("Helvetica", 11, "bold"), bg=self.PRIMARY_COLOR,
+                             fg=self.SECONDARY_COLOR, command=save_book, relief=tk.FLAT, cursor="hand2", padx=20,
+                             pady=10)
         save_btn.pack(pady=20)
 
     def delete_book(self):
@@ -900,26 +784,26 @@ class AdminDashboard:
         update_window.geometry("400x350")
         update_window.configure(bg=self.SECONDARY_COLOR)
 
-        tk.Label(update_window, text="Title:", font=("Helvetica", 11),
-                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(20, 5))
+        tk.Label(update_window, text="Title:", font=("Helvetica", 11), fg=self.TEXT_COLOR,
+                 bg=self.SECONDARY_COLOR).pack(pady=(20, 5))
         title_entry = tk.Entry(update_window, font=("Helvetica", 10), width=40)
         title_entry.insert(0, title)
         title_entry.pack(pady=(0, 10))
 
-        tk.Label(update_window, text="Author:", font=("Helvetica", 11),
-                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
+        tk.Label(update_window, text="Author:", font=("Helvetica", 11), fg=self.TEXT_COLOR,
+                 bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
         author_entry = tk.Entry(update_window, font=("Helvetica", 10), width=40)
         author_entry.insert(0, author)
         author_entry.pack(pady=(0, 10))
 
-        tk.Label(update_window, text="ISBN:", font=("Helvetica", 11),
-                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
+        tk.Label(update_window, text="ISBN:", font=("Helvetica", 11), fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(
+            pady=(10, 5))
         isbn_entry = tk.Entry(update_window, font=("Helvetica", 10), width=40)
         isbn_entry.insert(0, isbn)
         isbn_entry.pack(pady=(0, 10))
 
-        tk.Label(update_window, text="Quantity:", font=("Helvetica", 11),
-                 fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
+        tk.Label(update_window, text="Quantity:", font=("Helvetica", 11), fg=self.TEXT_COLOR,
+                 bg=self.SECONDARY_COLOR).pack(pady=(10, 5))
         quantity_entry = tk.Entry(update_window, font=("Helvetica", 10), width=40)
         quantity_entry.insert(0, total_qty)
         quantity_entry.pack(pady=(0, 20))
@@ -945,23 +829,13 @@ class AdminDashboard:
             except Exception as e:
                 messagebox.showerror("Error", str(e))
 
-        save_btn = tk.Button(
-            update_window,
-            text="UPDATE BOOK",
-            font=("Helvetica", 11, "bold"),
-            bg=self.PRIMARY_COLOR,
-            fg=self.SECONDARY_COLOR,
-            command=save_update,
-            relief=tk.FLAT,
-            cursor="hand2",
-            padx=20,
-            pady=10
-        )
+        save_btn = tk.Button(update_window, text="UPDATE BOOK", font=("Helvetica", 11, "bold"), bg=self.PRIMARY_COLOR,
+                             fg=self.SECONDARY_COLOR, command=save_update, relief=tk.FLAT, cursor="hand2", padx=20,
+                             pady=10)
         save_btn.pack(pady=20)
 
     def load_book_status(self):
         books = self.db_manager.get_all_books()
-
         total_qty = sum(book['quantity'] for book in books)
         available_qty = sum(book['available_quantity'] for book in books)
         borrowed_qty = total_qty - available_qty
@@ -975,31 +849,21 @@ class AdminDashboard:
 
         for book in books:
             borrowed = book['quantity'] - book['available_quantity']
-            self.status_tree.insert('', tk.END, values=(
-                book['title'],
-                book['author'],
-                book['quantity'],
-                book['available_quantity'],
-                borrowed
-            ))
+            self.status_tree.insert('', tk.END,
+                                    values=(book['title'], book['author'], book['quantity'], book['available_quantity'],
+                                            borrowed))
 
     def load_transactions(self):
         for item in self.transactions_tree.get_children():
             self.transactions_tree.delete(item)
 
         transactions = self.db_manager.get_all_transactions()
-
         for trans in transactions:
             due_date = trans['due_date'] if trans['due_date'] else "N/A"
-
-            self.transactions_tree.insert('', tk.END, values=(
-                trans['transaction_id'],
-                trans['username'],
-                trans['title'],
-                trans['transaction_type'].upper(),
-                trans['transaction_date'][:10],
-                due_date[:10] if due_date != "N/A" else "N/A"
-            ))
+            self.transactions_tree.insert('', tk.END,
+                                          values=(trans['transaction_id'], trans['username'], trans['title'],
+                                                  trans['transaction_type'].upper(), trans['transaction_date'][:10],
+                                                  due_date[:10] if due_date != "N/A" else "N/A"))
 
     def logout(self):
         if messagebox.askyesno("Logout", "Are you sure you want to logout?"):
@@ -1014,15 +878,14 @@ class StudentDashboard:
         self.logout_callback = logout_callback
         self.barcode_generator = BarcodeGenerator()
 
-        self.cart_items = []  # Store items pending request
+        self.cart_items = []
 
-        # Colors - Converted to Light Mode
+        # Enforced Light Mode UI Colors
         self.BG_COLOR = "#F5F5F5"
-        self.PRIMARY_COLOR = "#DC143C"  # Crimson Red
+        self.PRIMARY_COLOR = "#DC143C"
         self.SECONDARY_COLOR = "#FFFFFF"
         self.TEXT_COLOR = "#333333"
 
-        # Configure root window
         self.root.configure(bg=self.BG_COLOR)
         self.root.geometry("900x600")
         self.root.minsize(900, 600)
@@ -1034,31 +897,18 @@ class StudentDashboard:
         self.auto_update_transactions()
 
     def setup_ui(self):
-        # Header Frame
         header = tk.Frame(self.root, bg=self.PRIMARY_COLOR, height=60)
         header.pack(fill=tk.X)
         header.pack_propagate(False)
 
-        welcome_lbl = tk.Label(
-            header,
-            text=f"Welcome, {self.user_data['username']}!",
-            bg=self.PRIMARY_COLOR,
-            fg="#FFFFFF",
-            font=("Segoe UI", 14, "bold")
-        )
+        welcome_lbl = tk.Label(header, text=f"Welcome, {self.user_data['username']}!", bg=self.PRIMARY_COLOR,
+                               fg="#FFFFFF", font=("Segoe UI", 14, "bold"))
         welcome_lbl.pack(side=tk.LEFT, padx=20, pady=15)
 
-        logout_btn = tk.Button(
-            header,
-            text="Logout",
-            bg=self.SECONDARY_COLOR,
-            fg=self.TEXT_COLOR,
-            relief=tk.FLAT,
-            command=self.logout_callback
-        )
+        logout_btn = tk.Button(header, text="Logout", bg=self.SECONDARY_COLOR, fg=self.TEXT_COLOR, relief=tk.FLAT,
+                               command=self.logout_callback)
         logout_btn.pack(side=tk.RIGHT, padx=20, pady=15)
 
-        # Style Configuration for Notebook & Treeview (Light Mode)
         style = ttk.Style()
         style.theme_use('default')
         style.configure("TNotebook", background=self.BG_COLOR, borderwidth=0)
@@ -1070,7 +920,6 @@ class StudentDashboard:
         style.configure("Treeview.Heading", background=self.PRIMARY_COLOR, foreground="#FFFFFF", relief=tk.FLAT)
         style.map("Treeview", background=[("selected", "#E0E0E0")])
 
-        # Notebook for Tabs
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=20, pady=(20, 10))
 
@@ -1081,20 +930,13 @@ class StudentDashboard:
         books_top = tk.Frame(self.books_frame, bg=self.BG_COLOR)
         books_top.pack(fill=tk.X, pady=10)
 
-        refresh_btn = tk.Button(
-            books_top,
-            text="↻ Refresh List",
-            bg=self.PRIMARY_COLOR,
-            fg="#FFFFFF",
-            relief=tk.FLAT,
-            command=self.load_books
-        )
+        refresh_btn = tk.Button(books_top, text="↻ Refresh List", bg=self.PRIMARY_COLOR, fg="#FFFFFF", relief=tk.FLAT,
+                                command=self.load_books)
         refresh_btn.pack(side=tk.LEFT, padx=10)
 
         help_lbl = tk.Label(books_top, text="(Double-click a book to view its Barcode)", bg=self.BG_COLOR, fg="#555555")
         help_lbl.pack(side=tk.LEFT, padx=10)
 
-        # Books Treeview
         columns = ('ID', 'Title', 'Author', 'ISBN', 'Available')
         self.books_tree = ttk.Treeview(self.books_frame, columns=columns, show='headings')
 
@@ -1114,19 +956,18 @@ class StudentDashboard:
         self.trans_frame = tk.Frame(self.notebook, bg=self.BG_COLOR)
         self.notebook.add(self.trans_frame, text="My Transactions")
 
-        # ADDED 'Status' to columns
         t_columns = ('Title', 'Borrowed Date', 'Due Date', 'Status')
         self.trans_tree = ttk.Treeview(self.trans_frame, columns=t_columns, show='headings')
 
         self.trans_tree.heading('Title', text='Book Title')
-        self.trans_tree.heading('Borrowed Date', text='Request/Borrow Date')
+        self.trans_tree.heading('Borrowed Date', text='Request Date')
         self.trans_tree.heading('Due Date', text='Due Date')
-        self.trans_tree.heading('Status', text='Status')  # New Heading
+        self.trans_tree.heading('Status', text='Status')
 
         self.trans_tree.column('Title', width=350)
         self.trans_tree.column('Borrowed Date', width=150)
         self.trans_tree.column('Due Date', width=150)
-        self.trans_tree.column('Status', width=100)  # New Column width
+        self.trans_tree.column('Status', width=100)
 
         self.trans_tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=20)
 
@@ -1189,13 +1030,11 @@ class StudentDashboard:
             messagebox.showwarning("Warning", "Quantity must be a valid number greater than 0.")
             return
 
-        # Parse Title string visually for the cart
         book_title = book_selection.split("]")[1].split("(Avail")[0].strip()
 
         self.cart_text.insert(tk.END, f"{book_title} (Qty: {qty})\n")
         self.cart_items.append((book_selection, int(qty)))
 
-        # Reset selection
         self.book_combo.set('')
         self.qty_entry.delete(0, tk.END)
         self.qty_entry.insert(0, "1")
@@ -1207,21 +1046,18 @@ class StudentDashboard:
 
         try:
             for book_str, qty in self.cart_items:
-                # Extract the book ID from the combo string format "[1] Book Title (Avail: 5)"
                 book_id_str = book_str.split("]")[0].replace("[", "")
                 book_id = int(book_id_str)
-
-                # Assume your db_manager handles the request creation (Make sure it commits!)
                 self.db_manager.add_book_request(self.user_data['user_id'], book_id, qty)
 
             messagebox.showinfo("Success", "Request sent to Admin successfully!")
 
-            # Clear cart
             self.cart_text.delete(1.0, tk.END)
             self.cart_items.clear()
 
-        except AttributeError:
-            messagebox.showerror("Error", "add_book_request method is missing in database.py")
+            # Immediately refresh the UI so the user sees the request pop up instantly
+            self.load_transactions()
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to submit: {str(e)}")
 
@@ -1233,8 +1069,9 @@ class StudentDashboard:
         for t in borrowed:
             borrow_date = str(t['transaction_date'])[:16] if t['transaction_date'] else "N/A"
             due_date = str(t['due_date'])[:16] if t['due_date'] else "N/A"
+            status = t.get('status', 'Unknown')
 
-            self.trans_tree.insert('', tk.END, values=(t['title'], borrow_date, due_date))
+            self.trans_tree.insert('', tk.END, values=(t['title'], borrow_date, due_date, status))
 
     def auto_update_transactions(self):
         self.load_transactions()
@@ -1263,13 +1100,8 @@ class StudentDashboard:
         header.pack(fill=tk.X)
         header.pack_propagate(False)
 
-        header_label = tk.Label(
-            header,
-            text="Book Details & Barcode",
-            font=("Segoe UI", 12, "bold"),
-            fg="#FFFFFF",
-            bg=self.PRIMARY_COLOR
-        )
+        header_label = tk.Label(header, text="Book Details & Barcode", font=("Segoe UI", 12, "bold"), fg="#FFFFFF",
+                                bg=self.PRIMARY_COLOR)
         header_label.pack(pady=10)
 
         content = tk.Frame(barcode_window, bg=self.BG_COLOR)
@@ -1289,26 +1121,12 @@ class StudentDashboard:
             item_frame = tk.Frame(info_frame, bg=self.SECONDARY_COLOR)
             item_frame.pack(fill=tk.X, padx=10, pady=4)
 
-            icon_label = tk.Label(
-                item_frame,
-                text=label_text,
-                font=("Segoe UI", 10, "bold"),
-                fg=self.PRIMARY_COLOR,
-                bg=self.SECONDARY_COLOR,
-                width=8,
-                anchor="w"
-            )
+            icon_label = tk.Label(item_frame, text=label_text, font=("Segoe UI", 10, "bold"), fg=self.PRIMARY_COLOR,
+                                  bg=self.SECONDARY_COLOR, width=8, anchor="w")
             icon_label.pack(side=tk.LEFT, padx=(0, 5))
 
-            value = tk.Label(
-                item_frame,
-                text=value_text,
-                font=("Segoe UI", 10),
-                fg=self.TEXT_COLOR,
-                bg=self.SECONDARY_COLOR,
-                wraplength=230,
-                justify=tk.LEFT
-            )
+            value = tk.Label(item_frame, text=value_text, font=("Segoe UI", 10), fg=self.TEXT_COLOR,
+                             bg=self.SECONDARY_COLOR, wraplength=230, justify=tk.LEFT)
             value.pack(side=tk.LEFT)
 
         barcode_section = tk.Frame(content, bg=self.SECONDARY_COLOR, relief=tk.FLAT, bd=0)
@@ -1320,7 +1138,6 @@ class StudentDashboard:
         try:
             barcode_image = self.barcode_generator.generate_barcode(str(isbn))
             barcode_photo = ImageTk.PhotoImage(barcode_image)
-
             barcode_label.config(image=barcode_photo)
             barcode_label.image = barcode_photo
         except Exception as e:
@@ -1328,7 +1145,6 @@ class StudentDashboard:
 
 
 class LibraryManagementApp:
-
     def __init__(self, root):
         self.root = root
         self.root.title("Library Management System")
@@ -1343,19 +1159,14 @@ class LibraryManagementApp:
 
     def setup_styles(self):
         self.root.configure(bg="#FFFFFF")
-        self.color_primary = "#DC143C"
-        self.color_secondary = "#FFFFFF"
-        self.color_text = "#333333"
 
     def show_login_window(self):
         for widget in self.root.winfo_children():
             widget.destroy()
-
         login_window = LoginWindow(self.root, self.on_login_success, self.db_manager)
 
     def on_login_success(self, user_data):
         role = user_data['role'].lower()
-
         if role == 'student':
             self.show_student_dashboard(user_data)
         elif role == 'admin':
@@ -1364,11 +1175,9 @@ class LibraryManagementApp:
     def show_student_dashboard(self, user_data):
         for widget in self.root.winfo_children():
             widget.destroy()
-
         dashboard = StudentDashboard(self.root, user_data, self.db_manager, self.show_login_window)
 
     def show_admin_dashboard(self, user_data):
         for widget in self.root.winfo_children():
             widget.destroy()
-
         dashboard = AdminDashboard(self.root, user_data, self.db_manager, self.show_login_window)

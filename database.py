@@ -31,16 +31,20 @@ class DatabaseManager:
             available_quantity INTEGER
         )''')
 
-        # Added status column to transactions
         cursor.execute('''CREATE TABLE IF NOT EXISTS transactions (
             transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
             book_id INTEGER,
             transaction_type TEXT,
             transaction_date TEXT,
-            due_date TEXT,
-            status TEXT
+            due_date TEXT
         )''')
+
+        # AUTO-MIGRATION: Safely add the 'status' column if it's missing from an older database
+        try:
+            cursor.execute("SELECT status FROM transactions LIMIT 1")
+        except sqlite3.OperationalError:
+            cursor.execute("ALTER TABLE transactions ADD COLUMN status TEXT DEFAULT 'Active'")
 
         conn.commit()
         conn.close()
@@ -127,7 +131,6 @@ class DatabaseManager:
     def get_user_borrowed_books(self, user_id):
         conn = self.get_connection()
         cursor = conn.cursor()
-        # Added t.status and updated WHERE clause to show Pending requests
         cursor.execute('''SELECT t.transaction_id, b.title, t.transaction_date, t.due_date, b.book_id, t.transaction_type, t.status
                           FROM transactions t
                           JOIN books b ON t.book_id = b.book_id
@@ -138,12 +141,10 @@ class DatabaseManager:
 
     # --- Book Request & Approval Logic ---
     def add_book_request(self, user_id, book_id, qty):
-        """Called by StudentDashboard to request a book."""
         conn = self.get_connection()
         cursor = conn.cursor()
         date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # We store the requested quantity in the transaction_type column temporarily
         cursor.execute('''INSERT INTO transactions (user_id, book_id, transaction_type, transaction_date, status)
                           VALUES (?, ?, ?, ?, 'Pending')''',
                        (user_id, book_id, str(qty), date_now))
@@ -151,7 +152,6 @@ class DatabaseManager:
         conn.close()
 
     def get_pending_requests(self):
-        """Called by AdminDashboard to view pending requests."""
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('''SELECT t.transaction_id as request_id, u.username, b.title, 
@@ -165,12 +165,10 @@ class DatabaseManager:
         return reqs
 
     def update_request_status(self, req_id, status):
-        """Called by AdminDashboard to approve or reject a request."""
         conn = self.get_connection()
         cursor = conn.cursor()
 
         if status == "Approved":
-            # 1. Get the original request details
             cursor.execute("SELECT user_id, book_id, transaction_type FROM transactions WHERE transaction_id=?",
                            (req_id,))
             req = cursor.fetchone()
@@ -186,19 +184,13 @@ class DatabaseManager:
                 date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 due_date = (datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d")
 
-                # 2. Mark original request as Approved
                 cursor.execute("UPDATE transactions SET status='Approved' WHERE transaction_id=?", (req_id,))
-
-                # 3. Create a new Active transaction for the checked-out book
                 cursor.execute('''INSERT INTO transactions (user_id, book_id, transaction_type, transaction_date, due_date, status)
                                   VALUES (?, ?, 'borrowed', ?, ?, 'Active')''',
                                (user_id, book_id, date_now, due_date))
-
-                # 4. Deduct inventory
                 cursor.execute("UPDATE books SET available_quantity = available_quantity - ? WHERE book_id=?",
                                (qty, book_id))
         else:
-            # If "Rejected", simply update the status
             cursor.execute("UPDATE transactions SET status=? WHERE transaction_id=?", (status, req_id))
 
         conn.commit()
