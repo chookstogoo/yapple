@@ -1114,16 +1114,19 @@ class StudentDashboard:
         self.trans_frame = tk.Frame(self.notebook, bg=self.BG_COLOR)
         self.notebook.add(self.trans_frame, text="My Transactions")
 
-        t_columns = ('Title', 'Borrowed Date', 'Due Date')
+        # ADDED 'Status' to columns
+        t_columns = ('Title', 'Borrowed Date', 'Due Date', 'Status')
         self.trans_tree = ttk.Treeview(self.trans_frame, columns=t_columns, show='headings')
 
         self.trans_tree.heading('Title', text='Book Title')
-        self.trans_tree.heading('Borrowed Date', text='Borrowed Date')
+        self.trans_tree.heading('Borrowed Date', text='Request/Borrow Date')
         self.trans_tree.heading('Due Date', text='Due Date')
+        self.trans_tree.heading('Status', text='Status')  # New Heading
 
-        self.trans_tree.column('Title', width=400)
-        self.trans_tree.column('Borrowed Date', width=200)
-        self.trans_tree.column('Due Date', width=200)
+        self.trans_tree.column('Title', width=350)
+        self.trans_tree.column('Borrowed Date', width=150)
+        self.trans_tree.column('Due Date', width=150)
+        self.trans_tree.column('Status', width=100)  # New Column width
 
         self.trans_tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=20)
 

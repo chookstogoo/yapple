@@ -127,10 +127,11 @@ class DatabaseManager:
     def get_user_borrowed_books(self, user_id):
         conn = self.get_connection()
         cursor = conn.cursor()
-        cursor.execute('''SELECT t.transaction_id, b.title, t.transaction_date, t.due_date, b.book_id, t.transaction_type
+        # Added t.status and updated WHERE clause to show Pending requests
+        cursor.execute('''SELECT t.transaction_id, b.title, t.transaction_date, t.due_date, b.book_id, t.transaction_type, t.status
                           FROM transactions t
                           JOIN books b ON t.book_id = b.book_id
-                          WHERE t.user_id=? AND t.status='Active' ''', (user_id,))
+                          WHERE t.user_id=? AND t.status IN ('Pending', 'Active', 'Rejected') ''', (user_id,))
         books = [dict(row) for row in cursor.fetchall()]
         conn.close()
         return books
