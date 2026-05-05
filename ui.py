@@ -1,6 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, simpledialog
-import hashlib
+from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
 
 from database import DatabaseManager
@@ -488,6 +487,9 @@ class AdminDashboard:
     def open_scanner(self):
         BarcodeScannerWindow(self.root, self.handle_scanned_barcode)
 
+    def _digits_only(self, s):
+        return "".join(c for c in str(s) if c.isdigit())
+
     def handle_scanned_barcode(self, scanned_isbn):
         if scanned_isbn == "X" or not scanned_isbn:
             self.root.after(100, lambda: messagebox.showerror(
@@ -496,15 +498,17 @@ class AdminDashboard:
             ))
             return
 
+        scan_key = self._digits_only(scanned_isbn)
         found = False
         for item in self.books_tree.get_children():
             values = self.books_tree.item(item, 'values')
-            if len(values) >= 4 and values[3] == scanned_isbn:
+            if len(values) >= 4 and self._digits_only(values[3]) == scan_key:
                 self.books_tree.selection_set(item)
                 self.books_tree.focus(item)
                 self.books_tree.see(item)
                 found = True
-                self.root.after(100, lambda: messagebox.showinfo("Scanner Success", f"Found book: {values[1]}"))
+                book_title = values[1]
+                self.root.after(100, lambda t=book_title: messagebox.showinfo("Scanner Success", f"Found book: {t}"))
                 break
 
         if not found:
@@ -626,12 +630,19 @@ class AdminDashboard:
         tree_frame = tk.Frame(self.requests_tab, bg=self.SECONDARY_COLOR)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
 
-        columns = ("Req ID", "User", "Book Title", "Qty", "Status")
+        columns = ("Trans ID", "User", "Book Title", "Qty Requested", "Date Requested")
         self.requests_tree = ttk.Treeview(tree_frame, columns=columns, height=15, show="headings")
 
         for col in columns:
             self.requests_tree.heading(col, text=col)
-            self.requests_tree.column(col, width=100)
+            if col == "Trans ID":
+                self.requests_tree.column(col, width=60)
+            elif col == "Qty Requested":
+                self.requests_tree.column(col, width=100)
+            elif col == "Date Requested":
+                self.requests_tree.column(col, width=150)
+            else:
+                self.requests_tree.column(col, width=180)
 
         self.requests_tree.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
 
@@ -657,41 +668,52 @@ class AdminDashboard:
         for item in self.requests_tree.get_children():
             self.requests_tree.delete(item)
 
-        try:
-            requests = self.db_manager.get_pending_requests()
-            for req in requests:
-                self.requests_tree.insert('', tk.END, values=(
-                    req['request_id'], req['username'], req['title'], req['qty'], req['status']
-                ))
-        except Exception as e:
-            pass
+        for r in self.db_manager.get_pending_requests():
+            date_str = str(r['transaction_date'])[:16] if r['transaction_date'] else "N/A"
+            self.requests_tree.insert('', tk.END, values=(
+                r['transaction_id'],
+                r['username'],
+                r['title'],
+                r['qty_requested'],
+                date_str
+            ))
 
     def approve_request(self):
         selection = self.requests_tree.selection()
         if not selection:
-            messagebox.showwarning("Warning", "Select a request to approve.")
+            messagebox.showwarning("Warning", "Select a pending request to approve.")
             return
 
-        req_id = self.requests_tree.item(selection[0], 'values')[0]
-        try:
-            self.db_manager.update_request_status(req_id, "Approved")
-            messagebox.showinfo("Success", "Request Approved.")
+        trans_id = self.requests_tree.item(selection[0], 'values')[0]
+        reqs = self.db_manager.get_pending_requests()
+        req = next((r for r in reqs if str(r['transaction_id']) == str(trans_id)), None)
+
+        if req:
+            self.db_manager.admin_approve_request(
+                req['transaction_id'],
+                req['user_id'],
+                req['book_id'],
+                req['qty_requested']
+            )
+            messagebox.showinfo("Success", f"Request for '{req['title']}' approved!")
             self.load_requests()
-            self.load_book_status()
             self.load_books()
-        except Exception as e:
-            messagebox.showerror("Error", f"Could not approve: {e}")
+            self.load_book_status()
+        else:
+            messagebox.showerror("Error", "Could not find the selected request. Please refresh.")
 
     def reject_request(self):
         selection = self.requests_tree.selection()
         if not selection:
-            messagebox.showwarning("Warning", "Select a request to reject.")
+            messagebox.showwarning("Warning", "Select a pending request to reject.")
             return
 
-        req_id = self.requests_tree.item(selection[0], 'values')[0]
+        trans_id = self.requests_tree.item(selection[0], 'values')[0]
+        if not messagebox.askyesno("Reject", "Reject this request?"):
+            return
         try:
-            self.db_manager.update_request_status(req_id, "Rejected")
-            messagebox.showinfo("Success", "Request Rejected.")
+            self.db_manager.update_request_status(trans_id, "Rejected")
+            messagebox.showinfo("Success", "Request rejected.")
             self.load_requests()
         except Exception as e:
             messagebox.showerror("Error", f"Could not reject: {e}")
@@ -701,6 +723,9 @@ class AdminDashboard:
         add_window.title("Add New Book")
         add_window.geometry("400x350")
         add_window.configure(bg=self.SECONDARY_COLOR)
+        add_window.transient(self.root)
+        add_window.lift()
+        add_window.focus_force()
 
         tk.Label(add_window, text="Title:", font=("Helvetica", 11), fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(
             pady=(20, 5))
@@ -727,10 +752,10 @@ class AdminDashboard:
         quantity_entry.pack(pady=(0, 20))
 
         def save_book():
-            title = title_entry.get()
-            author = author_entry.get()
-            isbn = isbn_entry.get()
-            quantity = quantity_entry.get()
+            title = title_entry.get().strip()
+            author = author_entry.get().strip()
+            isbn = isbn_entry.get().strip()
+            quantity = quantity_entry.get().strip()
 
             if not all([title, author, isbn, quantity]):
                 messagebox.showerror("Error", "Please fill all fields")
@@ -741,6 +766,7 @@ class AdminDashboard:
                 self.db_manager.add_book(title, author, isbn, quantity)
                 messagebox.showinfo("Success", "Book added successfully!")
                 self.load_books()
+                self.load_book_status()
                 add_window.destroy()
             except ValueError:
                 messagebox.showerror("Error", "Quantity must be a number")
@@ -766,6 +792,7 @@ class AdminDashboard:
                 self.db_manager.delete_book(int(book_id))
                 messagebox.showinfo("Success", "Book deleted successfully!")
                 self.load_books()
+                self.load_book_status()
             except Exception as e:
                 messagebox.showerror("Error", str(e))
 
@@ -783,6 +810,9 @@ class AdminDashboard:
         update_window.title("Update Book")
         update_window.geometry("400x350")
         update_window.configure(bg=self.SECONDARY_COLOR)
+        update_window.transient(self.root)
+        update_window.lift()
+        update_window.focus_force()
 
         tk.Label(update_window, text="Title:", font=("Helvetica", 11), fg=self.TEXT_COLOR,
                  bg=self.SECONDARY_COLOR).pack(pady=(20, 5))
@@ -809,10 +839,10 @@ class AdminDashboard:
         quantity_entry.pack(pady=(0, 20))
 
         def save_update():
-            new_title = title_entry.get()
-            new_author = author_entry.get()
-            new_isbn = isbn_entry.get()
-            new_quantity = quantity_entry.get()
+            new_title = title_entry.get().strip()
+            new_author = author_entry.get().strip()
+            new_isbn = isbn_entry.get().strip()
+            new_quantity = quantity_entry.get().strip()
 
             if not all([new_title, new_author, new_isbn, new_quantity]):
                 messagebox.showerror("Error", "Please fill all fields")
@@ -823,6 +853,7 @@ class AdminDashboard:
                 self.db_manager.update_book(int(book_id), new_title, new_author, new_isbn, new_quantity)
                 messagebox.showinfo("Success", "Book updated successfully!")
                 self.load_books()
+                self.load_book_status()
                 update_window.destroy()
             except ValueError:
                 messagebox.showerror("Error", "Quantity must be a number")

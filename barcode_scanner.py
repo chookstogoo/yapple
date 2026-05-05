@@ -1,7 +1,8 @@
+import threading
+
 import cv2
 import numpy as np
 from pyzbar.pyzbar import decode
-import threading
 
 class BarcodeScannerWindow:
     def __init__(self, parent, callback):
@@ -70,9 +71,10 @@ class BarcodeScannerWindow:
         cap.release()
         cv2.destroyAllWindows()
 
-        # 5. Send the result back to your ui.py file
-        if scanned_isbn:
-            self.callback(scanned_isbn)
-        else:
-            # Return "X" if the user closed the window without scanning anything
-            self.callback("X")
+        # 5. Send the result on the Tk main thread (callbacks must not run from this worker thread)
+        result = scanned_isbn if scanned_isbn else "X"
+
+        def deliver():
+            self.callback(result)
+
+        self.parent.after(0, deliver)
