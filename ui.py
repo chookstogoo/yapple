@@ -36,7 +36,6 @@ class LoginWindow:
         self.setup_ui()
 
     def resize_image(self, event):
-        """Dynamically scales the image when the canvas is resized."""
         if not self.original_image:
             return
 
@@ -69,7 +68,6 @@ class LoginWindow:
         main_container = tk.Frame(self.root, bg=self.SECONDARY_COLOR)
         main_container.pack(fill=tk.BOTH, expand=True)
 
-        # ===== LEFT SIDEBAR =====
         left_sidebar = tk.Frame(main_container, bg=self.PRIMARY_COLOR, width=400)
         left_sidebar.pack(side=tk.LEFT, fill=tk.BOTH, expand=False)
         left_sidebar.pack_propagate(False)
@@ -96,12 +94,10 @@ class LoginWindow:
             tk.Label(feature_frame, text=f"● {feature_text}", font=("Helvetica", 13), bg=self.PRIMARY_COLOR,
                      fg=self.SECONDARY_COLOR).pack()
 
-        # --- DYNAMIC IMAGE CANVAS ---
         self.image_canvas = tk.Canvas(sidebar_content, bg=self.PRIMARY_COLOR, highlightthickness=0)
         self.image_canvas.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True, pady=(20, 0))
         self.image_canvas.bind("<Configure>", self.resize_image)
 
-        # ===== RIGHT SECTION =====
         right_section = tk.Frame(main_container, bg=self.SECONDARY_COLOR)
         right_section.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
@@ -383,7 +379,7 @@ class AdminDashboard:
         self.db_manager = db_manager
         self.logout_callback = logout_callback
 
-        # Colors
+        # Colors (Light Mode)
         self.PRIMARY_COLOR = "#DC143C"
         self.SECONDARY_COLOR = "#FFFFFF"
         self.TEXT_COLOR = "#333333"
@@ -443,6 +439,11 @@ class AdminDashboard:
         self.transaction_tab = tk.Frame(notebook, bg=self.SECONDARY_COLOR)
         notebook.add(self.transaction_tab, text="📋 Transactions")
         self.setup_transactions_tab()
+
+        # Tab 4: Pending Book Requests
+        self.requests_tab = tk.Frame(notebook, bg=self.SECONDARY_COLOR)
+        notebook.add(self.requests_tab, text="🔔 Pending Requests")
+        self.setup_requests_tab()
 
     def setup_book_management_tab(self):
         # Button frame
@@ -505,12 +506,11 @@ class AdminDashboard:
         )
         refresh_btn.pack(side=tk.LEFT, padx=5)
 
-        # Scanner Button Integration
         scan_btn = tk.Button(
             button_frame,
             text="📷 SCAN BOOK",
             font=("Helvetica", 11, "bold"),
-            bg="#17A2B8",  # Cyan/Teal color
+            bg="#17A2B8",
             fg=self.SECONDARY_COLOR,
             command=self.open_scanner,
             relief=tk.FLAT,
@@ -520,7 +520,6 @@ class AdminDashboard:
         )
         scan_btn.pack(side=tk.LEFT, padx=5)
 
-        # Books treeview
         tree_frame = tk.Frame(self.book_tab, bg=self.SECONDARY_COLOR)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
 
@@ -544,37 +543,28 @@ class AdminDashboard:
 
         self.load_books()
 
-    # --- Scanner Methods ---
     def open_scanner(self):
-        # Open the scanner window and pass the callback function
         BarcodeScannerWindow(self.root, self.handle_scanned_barcode)
 
     def handle_scanned_barcode(self, scanned_isbn):
-        # 1. Catch the "X" (Failed/Blurry Scan) or empty scans
         if scanned_isbn == "X" or not scanned_isbn:
-            # We use root.after to delay the messagebox, ensuring the camera window fully closes first.
             self.root.after(100, lambda: messagebox.showerror(
                 "Scan Error",
                 "The scanner couldn't read the barcode clearly. Please check the focus and lighting, then try again."
             ))
             return
 
-            # 2. Find the book with this ISBN in the treeview
         found = False
         for item in self.books_tree.get_children():
             values = self.books_tree.item(item, 'values')
             if len(values) >= 4 and values[3] == scanned_isbn:
-                # Select the item, focus it, and scroll to it
                 self.books_tree.selection_set(item)
                 self.books_tree.focus(item)
                 self.books_tree.see(item)
                 found = True
-
-                # Delay success message
                 self.root.after(100, lambda: messagebox.showinfo("Scanner Success", f"Found book: {values[1]}"))
                 break
 
-        # 3. Handle New Books not found in the system
         if not found:
             def ask_to_add():
                 user_wants_to_add = messagebox.askyesno(
@@ -584,24 +574,18 @@ class AdminDashboard:
                 if user_wants_to_add:
                     self.add_book(prefill_isbn=scanned_isbn)
 
-            # Delay the prompt so the camera can close without freezing Tkinter
             self.root.after(100, ask_to_add)
 
-    # --- End Scanner Methods ---
-
     def setup_book_status_tab(self):
-        # Status display
         status_frame = tk.Frame(self.status_tab, bg=self.SECONDARY_COLOR)
         status_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
         tk.Label(status_frame, text="📊 LIBRARY STATISTICS", font=("Helvetica", 14, "bold"),
                  fg=self.PRIMARY_COLOR, bg=self.SECONDARY_COLOR).pack(anchor=tk.W, pady=(0, 20))
 
-        # Statistics cards
         stats_container = tk.Frame(status_frame, bg=self.SECONDARY_COLOR)
         stats_container.pack(fill=tk.X, pady=10)
 
-        # Total books
         self.total_books_label = tk.Label(
             stats_container,
             text="Total Books: 0",
@@ -615,7 +599,6 @@ class AdminDashboard:
         )
         self.total_books_label.pack(side=tk.LEFT, padx=10, fill=tk.BOTH, expand=True)
 
-        # Available books
         self.available_books_label = tk.Label(
             stats_container,
             text="Available Books: 0",
@@ -629,7 +612,6 @@ class AdminDashboard:
         )
         self.available_books_label.pack(side=tk.LEFT, padx=10, fill=tk.BOTH, expand=True)
 
-        # Borrowed books
         self.borrowed_books_label = tk.Label(
             stats_container,
             text="Borrowed Books: 0",
@@ -643,7 +625,6 @@ class AdminDashboard:
         )
         self.borrowed_books_label.pack(side=tk.LEFT, padx=10, fill=tk.BOTH, expand=True)
 
-        # Book status treeview
         tk.Label(status_frame, text="\n📖 Individual Book Status:", font=("Helvetica", 12, "bold"),
                  fg=self.TEXT_COLOR, bg=self.SECONDARY_COLOR).pack(anchor=tk.W, pady=(20, 10))
 
@@ -683,7 +664,6 @@ class AdminDashboard:
         self.load_book_status()
 
     def setup_transactions_tab(self):
-        # Button frame
         button_frame = tk.Frame(self.transaction_tab, bg=self.ACCENT_COLOR, relief=tk.RAISED, bd=2)
         button_frame.pack(fill=tk.X, padx=20, pady=20)
 
@@ -701,7 +681,6 @@ class AdminDashboard:
         )
         refresh_btn.pack(side=tk.LEFT, padx=5)
 
-        # Transactions treeview
         tree_frame = tk.Frame(self.transaction_tab, bg=self.SECONDARY_COLOR)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
 
@@ -725,6 +704,43 @@ class AdminDashboard:
 
         self.load_transactions()
 
+    def setup_requests_tab(self):
+        button_frame = tk.Frame(self.requests_tab, bg=self.ACCENT_COLOR, relief=tk.RAISED, bd=2)
+        button_frame.pack(fill=tk.X, padx=20, pady=20)
+
+        approve_btn = tk.Button(button_frame, text="✅ APPROVE", font=("Helvetica", 11, "bold"), bg="#28A745",
+                                fg=self.SECONDARY_COLOR, command=self.approve_request, relief=tk.FLAT, cursor="hand2",
+                                padx=15, pady=8)
+        approve_btn.pack(side=tk.LEFT, padx=5)
+
+        reject_btn = tk.Button(button_frame, text="❌ REJECT", font=("Helvetica", 11, "bold"), bg="#DC3545",
+                               fg=self.SECONDARY_COLOR, command=self.reject_request, relief=tk.FLAT, cursor="hand2",
+                               padx=15, pady=8)
+        reject_btn.pack(side=tk.LEFT, padx=5)
+
+        refresh_req_btn = tk.Button(button_frame, text="🔄 REFRESH", font=("Helvetica", 11, "bold"),
+                                    bg=self.PRIMARY_COLOR, fg=self.SECONDARY_COLOR, command=self.load_requests,
+                                    relief=tk.FLAT, cursor="hand2", padx=15, pady=8)
+        refresh_req_btn.pack(side=tk.LEFT, padx=5)
+
+        tree_frame = tk.Frame(self.requests_tab, bg=self.SECONDARY_COLOR)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
+
+        columns = ("Req ID", "User", "Book Title", "Qty", "Status")
+        self.requests_tree = ttk.Treeview(tree_frame, columns=columns, height=15, show="headings")
+
+        for col in columns:
+            self.requests_tree.heading(col, text=col)
+            self.requests_tree.column(col, width=100)
+
+        self.requests_tree.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
+
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.requests_tree.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.requests_tree.configure(yscroll=scrollbar.set)
+
+        self.load_requests()
+
     def load_books(self):
         for item in self.books_tree.get_children():
             self.books_tree.delete(item)
@@ -740,6 +756,52 @@ class AdminDashboard:
                 book['quantity'],
                 book['available_quantity']
             ))
+
+    def load_requests(self):
+        # Refresh the tree view with pending requests
+        for item in self.requests_tree.get_children():
+            self.requests_tree.delete(item)
+
+        try:
+            # Assumes a function in your db_manager that fetches pending requests
+            requests = self.db_manager.get_pending_requests()
+            for req in requests:
+                self.requests_tree.insert('', tk.END, values=(
+                    req['request_id'], req['username'], req['title'], req['qty'], req['status']
+                ))
+        except AttributeError:
+            # Fail gracefully if db function doesn't exist yet
+            pass
+
+    def approve_request(self):
+        selection = self.requests_tree.selection()
+        if not selection:
+            messagebox.showwarning("Warning", "Select a request to approve.")
+            return
+
+        req_id = self.requests_tree.item(selection[0], 'values')[0]
+        try:
+            self.db_manager.update_request_status(req_id, "Approved")
+            messagebox.showinfo("Success", "Request Approved.")
+            self.load_requests()
+            self.load_book_status()
+            self.load_books()
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not approve: {e}")
+
+    def reject_request(self):
+        selection = self.requests_tree.selection()
+        if not selection:
+            messagebox.showwarning("Warning", "Select a request to reject.")
+            return
+
+        req_id = self.requests_tree.item(selection[0], 'values')[0]
+        try:
+            self.db_manager.update_request_status(req_id, "Rejected")
+            messagebox.showinfo("Success", "Request Rejected.")
+            self.load_requests()
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not reject: {e}")
 
     def add_book(self, prefill_isbn=""):
         add_window = tk.Toplevel(self.root)
@@ -904,16 +966,13 @@ class AdminDashboard:
         available_qty = sum(book['available_quantity'] for book in books)
         borrowed_qty = total_qty - available_qty
 
-        # Update labels
         self.total_books_label.config(text=f"Total Books: {total_qty}")
         self.available_books_label.config(text=f"Available Books: {available_qty}")
         self.borrowed_books_label.config(text=f"Borrowed Books: {borrowed_qty}")
 
-        # Clear treeview
         for item in self.status_tree.get_children():
             self.status_tree.delete(item)
 
-        # Add books
         for book in books:
             borrowed = book['quantity'] - book['available_quantity']
             self.status_tree.insert('', tk.END, values=(
@@ -955,14 +1014,16 @@ class StudentDashboard:
         self.logout_callback = logout_callback
         self.barcode_generator = BarcodeGenerator()
 
-        # Colors
-        self.DARK_BG = "#1E1E1E"
+        self.cart_items = []  # Store items pending request
+
+        # Colors - Converted to Light Mode
+        self.BG_COLOR = "#F5F5F5"
         self.PRIMARY_COLOR = "#DC143C"  # Crimson Red
-        self.SECONDARY_COLOR = "#2D2D2D"
-        self.TEXT_COLOR = "#FFFFFF"
+        self.SECONDARY_COLOR = "#FFFFFF"
+        self.TEXT_COLOR = "#333333"
 
         # Configure root window
-        self.root.configure(bg=self.DARK_BG)
+        self.root.configure(bg=self.BG_COLOR)
         self.root.geometry("900x600")
         self.root.minsize(900, 600)
 
@@ -970,7 +1031,6 @@ class StudentDashboard:
         self.load_books()
         self.load_transactions()
 
-        # Start the auto-update loop for transactions
         self.auto_update_transactions()
 
     def setup_ui(self):
@@ -983,7 +1043,7 @@ class StudentDashboard:
             header,
             text=f"Welcome, {self.user_data['username']}!",
             bg=self.PRIMARY_COLOR,
-            fg=self.TEXT_COLOR,
+            fg="#FFFFFF",
             font=("Segoe UI", 14, "bold")
         )
         welcome_lbl.pack(side=tk.LEFT, padx=20, pady=15)
@@ -998,51 +1058,48 @@ class StudentDashboard:
         )
         logout_btn.pack(side=tk.RIGHT, padx=20, pady=15)
 
-        # Style Configuration for Notebook & Treeview
+        # Style Configuration for Notebook & Treeview (Light Mode)
         style = ttk.Style()
         style.theme_use('default')
-        style.configure("TNotebook", background=self.DARK_BG, borderwidth=0)
+        style.configure("TNotebook", background=self.BG_COLOR, borderwidth=0)
         style.configure("TNotebook.Tab", background=self.SECONDARY_COLOR, foreground=self.TEXT_COLOR, padding=[15, 5])
-        style.map("TNotebook.Tab", background=[("selected", self.PRIMARY_COLOR)])
+        style.map("TNotebook.Tab", background=[("selected", self.PRIMARY_COLOR)], foreground=[("selected", "#FFFFFF")])
 
         style.configure("Treeview", background=self.SECONDARY_COLOR, foreground=self.TEXT_COLOR,
                         fieldbackground=self.SECONDARY_COLOR, borderwidth=0)
-        style.configure("Treeview.Heading", background=self.PRIMARY_COLOR, foreground=self.TEXT_COLOR, relief=tk.FLAT)
-        style.map("Treeview", background=[("selected", self.PRIMARY_COLOR)])
+        style.configure("Treeview.Heading", background=self.PRIMARY_COLOR, foreground="#FFFFFF", relief=tk.FLAT)
+        style.map("Treeview", background=[("selected", "#E0E0E0")])
 
         # Notebook for Tabs
         self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=20, pady=(20, 10))
 
         # --- TAB 1: Library Books ---
-        self.books_frame = tk.Frame(self.notebook, bg=self.DARK_BG)
+        self.books_frame = tk.Frame(self.notebook, bg=self.BG_COLOR)
         self.notebook.add(self.books_frame, text="Library Books")
 
-        books_top = tk.Frame(self.books_frame, bg=self.DARK_BG)
+        books_top = tk.Frame(self.books_frame, bg=self.BG_COLOR)
         books_top.pack(fill=tk.X, pady=10)
 
         refresh_btn = tk.Button(
             books_top,
             text="↻ Refresh List",
             bg=self.PRIMARY_COLOR,
-            fg=self.TEXT_COLOR,
+            fg="#FFFFFF",
             relief=tk.FLAT,
             command=self.load_books
         )
         refresh_btn.pack(side=tk.LEFT, padx=10)
 
-        help_lbl = tk.Label(books_top, text="(Double-click a book to view its Barcode)", bg=self.DARK_BG, fg="#AAAAAA")
+        help_lbl = tk.Label(books_top, text="(Double-click a book to view its Barcode)", bg=self.BG_COLOR, fg="#555555")
         help_lbl.pack(side=tk.LEFT, padx=10)
 
         # Books Treeview
         columns = ('ID', 'Title', 'Author', 'ISBN', 'Available')
         self.books_tree = ttk.Treeview(self.books_frame, columns=columns, show='headings')
 
-        self.books_tree.heading('ID', text='ID')
-        self.books_tree.heading('Title', text='Title')
-        self.books_tree.heading('Author', text='Author')
-        self.books_tree.heading('ISBN', text='ISBN')
-        self.books_tree.heading('Available', text='Available')
+        for col in columns:
+            self.books_tree.heading(col, text=col)
 
         self.books_tree.column('ID', width=50, anchor=tk.CENTER)
         self.books_tree.column('Title', width=300)
@@ -1054,7 +1111,7 @@ class StudentDashboard:
         self.books_tree.bind('<Double-1>', self.on_book_selected)
 
         # --- TAB 2: My Transactions ---
-        self.trans_frame = tk.Frame(self.notebook, bg=self.DARK_BG)
+        self.trans_frame = tk.Frame(self.notebook, bg=self.BG_COLOR)
         self.notebook.add(self.trans_frame, text="My Transactions")
 
         t_columns = ('Title', 'Borrowed Date', 'Due Date')
@@ -1070,36 +1127,114 @@ class StudentDashboard:
 
         self.trans_tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=20)
 
+        # --- BOTTOM SECTION: Request Book Form ---
+        self.request_frame = tk.Frame(self.root, bg=self.SECONDARY_COLOR, height=130)
+        self.request_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=20, pady=(0, 20))
+        self.request_frame.pack_propagate(False)
+
+        top_req = tk.Frame(self.request_frame, bg=self.SECONDARY_COLOR)
+        top_req.pack(fill=tk.X, pady=10, padx=10)
+
+        tk.Label(top_req, text="Request Book:", bg=self.SECONDARY_COLOR, fg=self.TEXT_COLOR,
+                 font=("Segoe UI", 10, "bold")).pack(side=tk.LEFT, padx=5)
+
+        self.book_combo = ttk.Combobox(top_req, width=40, state="readonly")
+        self.book_combo.pack(side=tk.LEFT, padx=5)
+
+        tk.Label(top_req, text="Qty:", bg=self.SECONDARY_COLOR, fg=self.TEXT_COLOR, font=("Segoe UI", 10, "bold")).pack(
+            side=tk.LEFT, padx=5)
+        self.qty_entry = tk.Entry(top_req, width=5)
+        self.qty_entry.insert(0, "1")
+        self.qty_entry.pack(side=tk.LEFT, padx=5)
+
+        tk.Button(top_req, text="Add to Cart", bg=self.PRIMARY_COLOR, fg="#FFFFFF", relief=tk.FLAT,
+                  command=self.add_to_cart).pack(side=tk.LEFT, padx=10)
+
+        bottom_req = tk.Frame(self.request_frame, bg=self.SECONDARY_COLOR)
+        bottom_req.pack(fill=tk.BOTH, expand=True, padx=15, pady=(0, 10))
+
+        self.cart_text = tk.Text(bottom_req, height=3, width=60, bg=self.BG_COLOR, fg=self.TEXT_COLOR)
+        self.cart_text.pack(side=tk.LEFT, fill=tk.Y)
+
+        tk.Button(bottom_req, text="Submit Request to Admin", bg="#28A745", fg="#FFFFFF", font=("Segoe UI", 10, "bold"),
+                  relief=tk.FLAT, command=self.submit_request).pack(side=tk.LEFT, padx=20)
+
     def load_books(self):
-        # Clear existing
         for item in self.books_tree.get_children():
             self.books_tree.delete(item)
 
-        # Fetch from DB
         books = self.db_manager.get_all_books()
+        combo_values = []
+
         for b in books:
             self.books_tree.insert('', tk.END, values=(
                 b['book_id'], b['title'], b['author'], b['isbn'], b['available_quantity']
             ))
+            combo_values.append(f"[{b['book_id']}] {b['title']} (Avail: {b['available_quantity']})")
+
+        self.book_combo['values'] = combo_values
+
+    def add_to_cart(self):
+        book_selection = self.book_combo.get()
+        qty = self.qty_entry.get()
+
+        if not book_selection:
+            messagebox.showwarning("Warning", "Please select a book from the dropdown.")
+            return
+
+        if not qty.isdigit() or int(qty) <= 0:
+            messagebox.showwarning("Warning", "Quantity must be a valid number greater than 0.")
+            return
+
+        # Parse Title string visually for the cart
+        book_title = book_selection.split("]")[1].split("(Avail")[0].strip()
+
+        self.cart_text.insert(tk.END, f"{book_title} (Qty: {qty})\n")
+        self.cart_items.append((book_selection, int(qty)))
+
+        # Reset selection
+        self.book_combo.set('')
+        self.qty_entry.delete(0, tk.END)
+        self.qty_entry.insert(0, "1")
+
+    def submit_request(self):
+        if not self.cart_items:
+            messagebox.showwarning("Empty Cart", "Please add a book to the cart before submitting.")
+            return
+
+        try:
+            for book_str, qty in self.cart_items:
+                # Extract the book ID from the combo string format "[1] Book Title (Avail: 5)"
+                book_id_str = book_str.split("]")[0].replace("[", "")
+                book_id = int(book_id_str)
+
+                # Assume your db_manager handles the request creation (Make sure it commits!)
+                self.db_manager.add_book_request(self.user_data['user_id'], book_id, qty)
+
+            messagebox.showinfo("Success", "Request sent to Admin successfully!")
+
+            # Clear cart
+            self.cart_text.delete(1.0, tk.END)
+            self.cart_items.clear()
+
+        except AttributeError:
+            messagebox.showerror("Error", "add_book_request method is missing in database.py")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to submit: {str(e)}")
 
     def load_transactions(self):
-        # Clear existing
         for item in self.trans_tree.get_children():
             self.trans_tree.delete(item)
 
-        # Fetch currently borrowed books
         borrowed = self.db_manager.get_user_borrowed_books(self.user_data['user_id'])
         for t in borrowed:
-            # Slicing up to 16 to remove seconds/microseconds from timestamp
             borrow_date = str(t['transaction_date'])[:16] if t['transaction_date'] else "N/A"
             due_date = str(t['due_date'])[:16] if t['due_date'] else "N/A"
 
             self.trans_tree.insert('', tk.END, values=(t['title'], borrow_date, due_date))
 
     def auto_update_transactions(self):
-        # Reload the transactions in the background
         self.load_transactions()
-        # Schedule this function to run again in 5000 milliseconds (5 seconds)
         self.root.after(5000, self.auto_update_transactions)
 
     def on_book_selected(self, event):
@@ -1110,7 +1245,6 @@ class StudentDashboard:
         item = selection[0]
         values = self.books_tree.item(item, 'values')
 
-        # Ensure we have the expected number of values
         if len(values) >= 4:
             book_id, title, author, isbn = values[0], values[1], values[2], values[3]
             self.show_barcode(int(book_id), title, author, isbn)
@@ -1119,10 +1253,9 @@ class StudentDashboard:
         barcode_window = tk.Toplevel(self.root)
         barcode_window.title("Book Info")
         barcode_window.geometry("380x420")
-        barcode_window.configure(bg=self.DARK_BG)
+        barcode_window.configure(bg=self.BG_COLOR)
         barcode_window.resizable(False, False)
 
-        # Header
         header = tk.Frame(barcode_window, bg=self.PRIMARY_COLOR, height=50)
         header.pack(fill=tk.X)
         header.pack_propagate(False)
@@ -1131,16 +1264,14 @@ class StudentDashboard:
             header,
             text="Book Details & Barcode",
             font=("Segoe UI", 12, "bold"),
-            fg=self.TEXT_COLOR,
+            fg="#FFFFFF",
             bg=self.PRIMARY_COLOR
         )
         header_label.pack(pady=10)
 
-        # Content
-        content = tk.Frame(barcode_window, bg=self.DARK_BG)
+        content = tk.Frame(barcode_window, bg=self.BG_COLOR)
         content.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
 
-        # Info card
         info_frame = tk.Frame(content, bg=self.SECONDARY_COLOR, relief=tk.FLAT, bd=0)
         info_frame.pack(fill=tk.X, pady=(0, 12))
 
@@ -1177,7 +1308,6 @@ class StudentDashboard:
             )
             value.pack(side=tk.LEFT)
 
-        # Barcode section
         barcode_section = tk.Frame(content, bg=self.SECONDARY_COLOR, relief=tk.FLAT, bd=0)
         barcode_section.pack(fill=tk.BOTH, expand=True, pady=8)
 
@@ -1185,7 +1315,6 @@ class StudentDashboard:
         barcode_label.pack(pady=15)
 
         try:
-            # We use the ISBN for the barcode
             barcode_image = self.barcode_generator.generate_barcode(str(isbn))
             barcode_photo = ImageTk.PhotoImage(barcode_image)
 
@@ -1203,31 +1332,25 @@ class LibraryManagementApp:
         self.root.geometry("900x600")
         self.root.configure(bg="#F5F5F5")
 
-        # Initialize database
         self.db_manager = DatabaseManager()
         self.db_manager.create_tables()
 
-        # Set application icon and style
         self.setup_styles()
-
-        # Start with login window
         self.show_login_window()
 
     def setup_styles(self):
         self.root.configure(bg="#FFFFFF")
-        self.color_primary = "#DC143C"  # Crimson Red
-        self.color_secondary = "#FFFFFF"  # White
-        self.color_text = "#333333"  # Dark text
+        self.color_primary = "#DC143C"
+        self.color_secondary = "#FFFFFF"
+        self.color_text = "#333333"
 
     def show_login_window(self):
-        # Clear root window
         for widget in self.root.winfo_children():
             widget.destroy()
 
         login_window = LoginWindow(self.root, self.on_login_success, self.db_manager)
 
     def on_login_success(self, user_data):
-        # Convert to lowercase to catch both "Student" and "student"
         role = user_data['role'].lower()
 
         if role == 'student':
@@ -1236,14 +1359,12 @@ class LibraryManagementApp:
             self.show_admin_dashboard(user_data)
 
     def show_student_dashboard(self, user_data):
-        # The local file import is removed, we just use the class defined above
         for widget in self.root.winfo_children():
             widget.destroy()
 
         dashboard = StudentDashboard(self.root, user_data, self.db_manager, self.show_login_window)
 
     def show_admin_dashboard(self, user_data):
-        # The local file import is removed, we just use the class defined above
         for widget in self.root.winfo_children():
             widget.destroy()
 

@@ -135,22 +135,26 @@ class DatabaseManager:
         conn.close()
         return books
 
-    # --- NEW: Request, Approve, Return Logic ---
-    def request_books(self, user_id, cart_items):
+    # --- Book Request & Approval Logic ---
+    def add_book_request(self, user_id, book_id, qty):
+        """Called by StudentDashboard to request a book."""
         conn = self.get_connection()
         cursor = conn.cursor()
         date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        for item in cart_items:
-            cursor.execute('''INSERT INTO transactions (user_id, book_id, transaction_type, transaction_date, status)
-                              VALUES (?, ?, ?, ?, 'Pending')''',
-                           (user_id, item['book_id'], f"{item['qty']}", date_now))
+
+        # We store the requested quantity in the transaction_type column temporarily
+        cursor.execute('''INSERT INTO transactions (user_id, book_id, transaction_type, transaction_date, status)
+                          VALUES (?, ?, ?, ?, 'Pending')''',
+                       (user_id, book_id, str(qty), date_now))
         conn.commit()
         conn.close()
 
     def get_pending_requests(self):
+        """Called by AdminDashboard to view pending requests."""
         conn = self.get_connection()
         cursor = conn.cursor()
-        cursor.execute('''SELECT t.transaction_id, u.username, b.title, t.transaction_type as qty_requested, t.transaction_date, t.book_id, t.user_id
+        cursor.execute('''SELECT t.transaction_id as request_id, u.username, b.title, 
+                                 t.transaction_type as qty, t.status
                           FROM transactions t
                           JOIN users u ON t.user_id = u.user_id
                           JOIN books b ON t.book_id = b.book_id
@@ -159,27 +163,42 @@ class DatabaseManager:
         conn.close()
         return reqs
 
-    def admin_approve_request(self, transaction_id, user_id, book_id, qty_requested):
+    def update_request_status(self, req_id, status):
+        """Called by AdminDashboard to approve or reject a request."""
         conn = self.get_connection()
         cursor = conn.cursor()
-        date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        due_date = (datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d")
 
-        try:
-            qty = int(qty_requested)
-        except ValueError:
-            qty = 1
+        if status == "Approved":
+            # 1. Get the original request details
+            cursor.execute("SELECT user_id, book_id, transaction_type FROM transactions WHERE transaction_id=?",
+                           (req_id,))
+            req = cursor.fetchone()
 
-        # 1. Update original to Approved
-        cursor.execute("UPDATE transactions SET status='Approved' WHERE transaction_id=?", (transaction_id,))
+            if req:
+                user_id = req['user_id']
+                book_id = req['book_id']
+                try:
+                    qty = int(req['transaction_type'])
+                except ValueError:
+                    qty = 1
 
-        # 2. Create new Active checkout
-        cursor.execute('''INSERT INTO transactions (user_id, book_id, transaction_type, transaction_date, due_date, status)
-                          VALUES (?, ?, ?, ?, ?, 'Active')''',
-                       (user_id, book_id, str(qty), date_now, due_date))
+                date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                due_date = (datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d")
 
-        # 3. Deduct inventory
-        cursor.execute("UPDATE books SET available_quantity = available_quantity - ? WHERE book_id=?", (qty, book_id))
+                # 2. Mark original request as Approved
+                cursor.execute("UPDATE transactions SET status='Approved' WHERE transaction_id=?", (req_id,))
+
+                # 3. Create a new Active transaction for the checked-out book
+                cursor.execute('''INSERT INTO transactions (user_id, book_id, transaction_type, transaction_date, due_date, status)
+                                  VALUES (?, ?, 'borrowed', ?, ?, 'Active')''',
+                               (user_id, book_id, date_now, due_date))
+
+                # 4. Deduct inventory
+                cursor.execute("UPDATE books SET available_quantity = available_quantity - ? WHERE book_id=?",
+                               (qty, book_id))
+        else:
+            # If "Rejected", simply update the status
+            cursor.execute("UPDATE transactions SET status=? WHERE transaction_id=?", (status, req_id))
 
         conn.commit()
         conn.close()
