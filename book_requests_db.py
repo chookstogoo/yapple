@@ -60,6 +60,28 @@ def request_books(user_id, cart_items):
     date_requested = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     for item in cart_items:
+        # --- NEW STOCK VALIDATION SYSTEM ---
+        cursor.execute("SELECT Available, Title FROM books WHERE ID = ?", (item['book_id'],))
+        result = cursor.fetchone()
+
+        if result:
+            current_stock = result[0]
+            title = result[1]
+            requested_qty = int(item['qty'])
+
+            if requested_qty > current_stock:
+                from tkinter import messagebox
+                messagebox.showerror("Stock Error",
+                                     f"Cannot borrow {requested_qty}. Only {current_stock} copies of '{title}' are available!")
+                conn.close()
+                return  # Halts the loop so no items are wrongfully inserted
+        else:
+            from tkinter import messagebox
+            messagebox.showerror("Error", "Book not found in the database.")
+            conn.close()
+            return
+        # --- END NEW STOCK VALIDATION ---
+
         cursor.execute("""
             INSERT INTO transactions (user_id, book_id, quantity, status, date) 
             VALUES (?, ?, ?, 'Pending', ?)

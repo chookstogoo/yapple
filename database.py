@@ -1,6 +1,7 @@
 import sqlite3
 from datetime import datetime, timedelta
 
+
 class DatabaseManager:
     def __init__(self, db_name="library.db"):
         self.db_name = db_name
@@ -35,11 +36,26 @@ class DatabaseManager:
             transaction_date TEXT,
             due_date TEXT
         )''')
+
         # AUTO-MIGRATION: Safely add the 'status' column if missing
         try:
             cursor.execute("SELECT status FROM transactions LIMIT 1")
         except sqlite3.OperationalError:
             cursor.execute("ALTER TABLE transactions ADD COLUMN status TEXT DEFAULT 'Active'")
+
+        # AUTO-MIGRATION & DATA FIX: Safely add the 'quantity' column and clean up glitchy UI data
+        try:
+            cursor.execute("SELECT quantity FROM transactions LIMIT 1")
+        except sqlite3.OperationalError:
+            cursor.execute("ALTER TABLE transactions ADD COLUMN quantity INTEGER DEFAULT 1")
+            # This fixes the older rows where the quantity number (e.g. '67') was mistakenly inserted into the 'Type' column
+            cursor.execute("""
+                UPDATE transactions 
+                SET quantity = CAST(transaction_type AS INTEGER), 
+                    transaction_type = 'Request' 
+                WHERE status = 'Pending' AND transaction_type != 'Request'
+            """)
+
         conn.commit()
         conn.close()
 
@@ -130,7 +146,7 @@ class DatabaseManager:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('''SELECT t.transaction_id, b.title, t.transaction_date, t.due_date,
-                                 b.book_id, t.transaction_type, t.status
+                                 b.book_id, t.transaction_type, t.status, t.quantity
                           FROM transactions t
                           JOIN books b ON t.book_id = b.book_id
                           WHERE t.user_id=? AND t.status IN ('Pending', 'Active')''', (user_id,))
@@ -144,10 +160,33 @@ class DatabaseManager:
         """Insert a single pending book request for a student."""
         conn = self.get_connection()
         cursor = conn.cursor()
+
+        # --- NEW STOCK VALIDATION SYSTEM ---
+        cursor.execute("SELECT title, available_quantity FROM books WHERE book_id=?", (book_id,))
+        row = cursor.fetchone()
+        if row:
+            current_stock = row['available_quantity']
+            selected_book_title = row['title']
+            requested_qty = int(qty)
+
+            if requested_qty > current_stock:
+                from tkinter import messagebox
+                messagebox.showerror("Stock Error",
+                                     f"Cannot borrow {requested_qty}. Only {current_stock} copies of '{selected_book_title}' are available!")
+                conn.close()
+                return  # Halts the function so the request isn't submitted
+        else:
+            from tkinter import messagebox
+            messagebox.showerror("Error", "Book not found in the database.")
+            conn.close()
+            return
+        # --- END NEW STOCK VALIDATION ---
+
         date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        cursor.execute('''INSERT INTO transactions (user_id, book_id, transaction_type, transaction_date, status)
-                          VALUES (?, ?, ?, ?, 'Pending')''',
-                       (user_id, book_id, str(qty), date_now))
+        # Fixed transaction_type mapping and added dedicated quantity column
+        cursor.execute('''INSERT INTO transactions (user_id, book_id, transaction_type, transaction_date, status, quantity)
+                          VALUES (?, ?, 'Request', ?, 'Pending', ?)''',
+                       (user_id, book_id, date_now, requested_qty))
         conn.commit()
         conn.close()
 
@@ -166,12 +205,13 @@ class DatabaseManager:
         """
         conn = self.get_connection()
         cursor = conn.cursor()
+        # Adjusted aliasing to target the proper quantity column instead of transaction_type
         cursor.execute('''SELECT t.transaction_id,
                                  t.user_id,
                                  t.book_id,
                                  u.username,
                                  b.title,
-                                 t.transaction_type AS qty_requested,
+                                 t.quantity AS qty_requested,
                                  t.transaction_date
                           FROM transactions t
                           JOIN users u ON t.user_id = u.user_id
@@ -203,11 +243,11 @@ class DatabaseManager:
         cursor.execute("UPDATE transactions SET status='Approved' WHERE transaction_id=?",
                        (transaction_id,))
 
-        # Create the actual borrow record
+        # Create the actual borrow record (now passing quantity correctly)
         cursor.execute('''INSERT INTO transactions
-                          (user_id, book_id, transaction_type, transaction_date, due_date, status)
-                          VALUES (?, ?, 'borrowed', ?, ?, 'Active')''',
-                       (user_id, book_id, date_now, due_date))
+                          (user_id, book_id, transaction_type, transaction_date, due_date, status, quantity)
+                          VALUES (?, ?, 'borrowed', ?, ?, 'Active', ?)''',
+                       (user_id, book_id, date_now, due_date, qty))
 
         # Reduce available stock
         cursor.execute("UPDATE books SET available_quantity = available_quantity - ? WHERE book_id=?",
