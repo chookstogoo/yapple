@@ -1,7 +1,6 @@
 import sqlite3
 from datetime import datetime, timedelta
 
-
 class DatabaseManager:
     def __init__(self, db_name="library.db"):
         self.db_name = db_name
@@ -14,14 +13,12 @@ class DatabaseManager:
     def create_tables(self):
         conn = self.get_connection()
         cursor = conn.cursor()
-
         cursor.execute('''CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
             password TEXT,
             role TEXT
         )''')
-
         cursor.execute('''CREATE TABLE IF NOT EXISTS books (
             book_id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT,
@@ -30,7 +27,6 @@ class DatabaseManager:
             quantity INTEGER,
             available_quantity INTEGER
         )''')
-
         cursor.execute('''CREATE TABLE IF NOT EXISTS transactions (
             transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
@@ -39,13 +35,11 @@ class DatabaseManager:
             transaction_date TEXT,
             due_date TEXT
         )''')
-
-        # AUTO-MIGRATION: Safely add the 'status' column if it's missing from an older database
+        # AUTO-MIGRATION: Safely add the 'status' column if missing
         try:
             cursor.execute("SELECT status FROM transactions LIMIT 1")
         except sqlite3.OperationalError:
             cursor.execute("ALTER TABLE transactions ADD COLUMN status TEXT DEFAULT 'Active'")
-
         conn.commit()
         conn.close()
 
@@ -119,7 +113,8 @@ class DatabaseManager:
     def get_all_transactions(self):
         conn = self.get_connection()
         cursor = conn.cursor()
-        cursor.execute('''SELECT t.transaction_id, u.username, b.title, t.transaction_type, t.transaction_date, t.due_date
+        cursor.execute('''SELECT t.transaction_id, u.username, b.title, t.transaction_type,
+                                 t.transaction_date, t.due_date
                           FROM transactions t
                           JOIN users u ON t.user_id = u.user_id
                           JOIN books b ON t.book_id = b.book_id
@@ -129,84 +124,115 @@ class DatabaseManager:
         return trans
 
     def get_user_borrowed_books(self, user_id):
+        """
+        Returns all non-returned transactions for the user (Pending requests + Active borrows).
+        """
         conn = self.get_connection()
         cursor = conn.cursor()
-        cursor.execute('''SELECT t.transaction_id, b.title, t.transaction_date, t.due_date, b.book_id, t.transaction_type, t.status
+        cursor.execute('''SELECT t.transaction_id, b.title, t.transaction_date, t.due_date,
+                                 b.book_id, t.transaction_type, t.status
                           FROM transactions t
                           JOIN books b ON t.book_id = b.book_id
-                          WHERE t.user_id=? AND t.status IN ('Pending', 'Active', 'Rejected') ''', (user_id,))
+                          WHERE t.user_id=? AND t.status IN ('Pending', 'Active')''', (user_id,))
         books = [dict(row) for row in cursor.fetchall()]
         conn.close()
         return books
 
     # --- Book Request & Approval Logic ---
+
     def add_book_request(self, user_id, book_id, qty):
+        """Insert a single pending book request for a student."""
         conn = self.get_connection()
         cursor = conn.cursor()
         date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
         cursor.execute('''INSERT INTO transactions (user_id, book_id, transaction_type, transaction_date, status)
                           VALUES (?, ?, ?, ?, 'Pending')''',
                        (user_id, book_id, str(qty), date_now))
         conn.commit()
         conn.close()
 
+    def request_books(self, user_id, cart):
+        """
+        Submit multiple book requests from the student cart.
+        cart is a list of dicts: [{'book_id': int, 'title': str, 'qty': int}, ...]
+        """
+        for item in cart:
+            self.add_book_request(user_id, item['book_id'], item['qty'])
+
     def get_pending_requests(self):
+        """
+        Returns all pending book requests with all fields needed by the admin dashboard.
+        Keys: transaction_id, user_id, book_id, username, title, qty_requested, transaction_date
+        """
         conn = self.get_connection()
         cursor = conn.cursor()
-        cursor.execute('''SELECT t.transaction_id as request_id, u.username, b.title, 
-                                 t.transaction_type as qty, t.status
+        cursor.execute('''SELECT t.transaction_id,
+                                 t.user_id,
+                                 t.book_id,
+                                 u.username,
+                                 b.title,
+                                 t.transaction_type AS qty_requested,
+                                 t.transaction_date
                           FROM transactions t
                           JOIN users u ON t.user_id = u.user_id
                           JOIN books b ON t.book_id = b.book_id
-                          WHERE t.status = 'Pending' ''')
+                          WHERE t.status = 'Pending'
+                          ORDER BY t.transaction_date ASC''')
         reqs = [dict(row) for row in cursor.fetchall()]
         conn.close()
         return reqs
 
-    def update_request_status(self, req_id, status):
+    def admin_approve_request(self, transaction_id, user_id, book_id, qty_requested):
+        """
+        Approve a pending request:
+        1. Mark the pending transaction as 'Approved'
+        2. Insert a new 'borrowed' / 'Active' transaction with a due date
+        3. Decrement available_quantity on the book
+        """
         conn = self.get_connection()
         cursor = conn.cursor()
+        try:
+            qty = int(qty_requested)
+        except (ValueError, TypeError):
+            qty = 1
 
-        if status == "Approved":
-            cursor.execute("SELECT user_id, book_id, transaction_type FROM transactions WHERE transaction_id=?",
-                           (req_id,))
-            req = cursor.fetchone()
+        date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        due_date = (datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d")
 
-            if req:
-                user_id = req['user_id']
-                book_id = req['book_id']
-                try:
-                    qty = int(req['transaction_type'])
-                except ValueError:
-                    qty = 1
+        # Mark the request row as Approved
+        cursor.execute("UPDATE transactions SET status='Approved' WHERE transaction_id=?",
+                       (transaction_id,))
 
-                date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                due_date = (datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d")
+        # Create the actual borrow record
+        cursor.execute('''INSERT INTO transactions
+                          (user_id, book_id, transaction_type, transaction_date, due_date, status)
+                          VALUES (?, ?, 'borrowed', ?, ?, 'Active')''',
+                       (user_id, book_id, date_now, due_date))
 
-                cursor.execute("UPDATE transactions SET status='Approved' WHERE transaction_id=?", (req_id,))
-                cursor.execute('''INSERT INTO transactions (user_id, book_id, transaction_type, transaction_date, due_date, status)
-                                  VALUES (?, ?, 'borrowed', ?, ?, 'Active')''',
-                               (user_id, book_id, date_now, due_date))
-                cursor.execute("UPDATE books SET available_quantity = available_quantity - ? WHERE book_id=?",
-                               (qty, book_id))
-        else:
-            cursor.execute("UPDATE transactions SET status=? WHERE transaction_id=?", (status, req_id))
+        # Reduce available stock
+        cursor.execute("UPDATE books SET available_quantity = available_quantity - ? WHERE book_id=?",
+                       (qty, book_id))
 
+        conn.commit()
+        conn.close()
+
+    def update_request_status(self, req_id, status):
+        """Legacy helper kept for compatibility."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE transactions SET status=? WHERE transaction_id=?", (status, req_id))
         conn.commit()
         conn.close()
 
     def return_book(self, transaction_id, book_id, quantity_str):
         conn = self.get_connection()
         cursor = conn.cursor()
-
         try:
             qty = int(quantity_str)
         except ValueError:
             qty = 1
-
         cursor.execute("UPDATE transactions SET status='Returned' WHERE transaction_id=?", (transaction_id,))
-        cursor.execute("UPDATE books SET available_quantity = available_quantity + ? WHERE book_id=?", (qty, book_id))
-
+        cursor.execute("UPDATE books SET available_quantity = available_quantity + ? WHERE book_id=?",
+                       (qty, book_id))
         conn.commit()
         conn.close()
