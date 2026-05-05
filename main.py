@@ -1,5 +1,4 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, simpledialog
 from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
 
@@ -480,7 +479,6 @@ class AdminDashboard:
             ))
 
     def add_book(self, prefill_isbn=""):
-        pass  # Keep your standard modal logic here
         add_window = tk.Toplevel(self.root)
         add_window.title("Add New Book")
         add_window.geometry("400x350")
@@ -538,7 +536,6 @@ class AdminDashboard:
                   pady=10).pack(pady=20)
 
     def delete_book(self):
-        pass
         selection = self.books_tree.selection()
         if not selection:
             messagebox.showwarning("Warning", "Please select a book to delete")
@@ -557,7 +554,6 @@ class AdminDashboard:
                 messagebox.showerror("Error", str(e))
 
     def update_book(self):
-        pass
         selection = self.books_tree.selection()
         if not selection:
             messagebox.showwarning("Warning", "Please select a book to update")
