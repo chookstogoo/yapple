@@ -581,6 +581,11 @@ class AdminDashboard:
                                 relief=tk.FLAT, cursor="hand2", padx=15, pady=8)
         refresh_btn.pack(side=tk.LEFT, padx=5)
 
+        return_btn = tk.Button(button_frame, text="🔙 RETURN BOOK", font=("Helvetica", 11, "bold"), bg="#17A2B8",
+                               fg=self.SECONDARY_COLOR, command=self.process_return, relief=tk.FLAT, cursor="hand2",
+                               padx=15, pady=8)
+        return_btn.pack(side=tk.LEFT, padx=5)
+
         tree_frame = tk.Frame(self.transaction_tab, bg=self.SECONDARY_COLOR)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
 
@@ -604,6 +609,41 @@ class AdminDashboard:
 
         self.load_transactions()
 
+    def process_return(self):
+        selection = self.transactions_tree.selection()
+        if not selection:
+            messagebox.showwarning("Warning", "Please select a borrowed transaction to return.")
+            return
+
+        item = self.transactions_tree.item(selection[0], 'values')
+        trans_id = item[0]
+        book_title = item[2]
+        trans_type = item[3]
+
+        if "BORROW" not in str(trans_type).upper():
+            messagebox.showwarning("Warning", "Only 'BORROWED' books can be returned.")
+            return
+
+        if messagebox.askyesno("Confirm", f"Process return for '{book_title}'?"):
+            try:
+                # Update transaction to RETURN and give the book back to inventory
+                cursor = self.db_manager.conn.cursor()
+                cursor.execute("UPDATE transactions SET transaction_type = 'RETURN' WHERE transaction_id = ?",
+                               (trans_id,))
+                cursor.execute("UPDATE books SET available_quantity = available_quantity + 1 WHERE title = ?",
+                               (book_title,))
+                self.db_manager.conn.commit()
+
+                messagebox.showinfo("Success", "Book returned successfully! Transaction logged.")
+                self.load_transactions()
+                self.load_book_status()
+                self.load_books()
+            except AttributeError:
+                messagebox.showerror("Error",
+                                     "Could not access database connection directly. Please check DatabaseManager.")
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not process return: {e}")
+
     def setup_requests_tab(self):
         button_frame = tk.Frame(self.requests_tab, bg=self.ACCENT_COLOR, relief=tk.RAISED, bd=2)
         button_frame.pack(fill=tk.X, padx=20, pady=20)
@@ -613,7 +653,7 @@ class AdminDashboard:
                                 padx=15, pady=8)
         approve_btn.pack(side=tk.LEFT, padx=5)
 
-        reject_btn = tk.Button(button_frame, text="❌ REJECT", font=("Helvetica", 11, "bold"), bg="#DC3545",
+        reject_btn = tk.Button(button_frame, text="❌ REJECT SELECTED", font=("Helvetica", 11, "bold"), bg="#DC3545",
                                fg=self.SECONDARY_COLOR, command=self.reject_request, relief=tk.FLAT, cursor="hand2",
                                padx=15, pady=8)
         reject_btn.pack(side=tk.LEFT, padx=5)
@@ -1029,6 +1069,7 @@ class StudentDashboard:
                 self.cart_text.pack_forget()
         except Exception:
             pass  # widget may not exist in every context
+
     # ─────────────────────────────────────────────────────────────────────────
 
     def add_to_cart(self):
@@ -1052,6 +1093,8 @@ class StudentDashboard:
         if req_qty > avail_qty:
             messagebox.showerror("Error",
                                  f"Not enough books available to borrow! You requested {req_qty}, but only {avail_qty} are available.")
+            self.qty_entry.delete(0, tk.END)
+            self.qty_entry.insert(0, "1")
             self._sync_cart_visibility()
             return
 
