@@ -1019,7 +1019,6 @@ class StudentDashboard:
 
         self.book_combo['values'] = combo_values
 
-
     # ── cart visibility helper (added by patch) ──────────────────────────────
     def _sync_cart_visibility(self):
         """Show the cart_text widget only when the cart has items."""
@@ -1031,6 +1030,7 @@ class StudentDashboard:
         except Exception:
             pass  # widget may not exist in every context
     # ─────────────────────────────────────────────────────────────────────────
+
     def add_to_cart(self):
         book_selection = self.book_combo.get()
         qty = self.qty_entry.get()
@@ -1063,6 +1063,7 @@ class StudentDashboard:
         self.book_combo.set('')
         self.qty_entry.delete(0, tk.END)
         self.qty_entry.insert(0, "1")
+        self._sync_cart_visibility()
 
     def submit_request(self):
         if not self.cart_items:
@@ -1079,7 +1080,7 @@ class StudentDashboard:
 
             self.cart_text.delete(1.0, tk.END)
             self.cart_items.clear()
-        self._sync_cart_visibility()
+            self._sync_cart_visibility()
 
             self.load_transactions()
 
