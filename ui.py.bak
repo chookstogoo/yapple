@@ -1019,30 +1019,16 @@ class StudentDashboard:
 
         self.book_combo['values'] = combo_values
 
-
-    # ── cart visibility helper (added by patch) ──────────────────────────────
-    def _sync_cart_visibility(self):
-        """Show the cart_text widget only when the cart has items."""
-        try:
-            if self.cart_items:
-                self.cart_text.pack(fill=tk.BOTH, expand=True)
-            else:
-                self.cart_text.pack_forget()
-        except Exception:
-            pass  # widget may not exist in every context
-    # ─────────────────────────────────────────────────────────────────────────
     def add_to_cart(self):
         book_selection = self.book_combo.get()
         qty = self.qty_entry.get()
 
         if not book_selection:
             messagebox.showwarning("Warning", "Please select a book from the dropdown.")
-            self._sync_cart_visibility()
             return
 
         if not qty.isdigit() or int(qty) <= 0:
             messagebox.showwarning("Warning", "Quantity must be a valid number greater than 0.")
-            self._sync_cart_visibility()
             return
 
         # SAFEGUARD: Extract available quantity and compare to requested amount
@@ -1052,7 +1038,6 @@ class StudentDashboard:
         if req_qty > avail_qty:
             messagebox.showerror("Error",
                                  f"Not enough books available to borrow! You requested {req_qty}, but only {avail_qty} are available.")
-            self._sync_cart_visibility()
             return
 
         book_title = book_selection.split("]")[1].split("(Avail")[0].strip()
@@ -1079,7 +1064,6 @@ class StudentDashboard:
 
             self.cart_text.delete(1.0, tk.END)
             self.cart_items.clear()
-        self._sync_cart_visibility()
 
             self.load_transactions()
 
