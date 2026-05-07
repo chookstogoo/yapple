@@ -575,10 +575,6 @@ class AdminDashboard:
                   fg=self.SECONDARY_COLOR, command=self.load_transactions, relief=tk.FLAT, cursor="hand2", padx=15,
                   pady=8).pack(side=tk.LEFT, padx=5)
 
-        tk.Button(button_frame, text="🔙 RETURN BOOK", font=("Helvetica", 11, "bold"), bg="#17A2B8",
-                  fg=self.SECONDARY_COLOR, command=self.process_return, relief=tk.FLAT, cursor="hand2", padx=15,
-                  pady=8).pack(side=tk.LEFT, padx=5)
-
         tree_frame = tk.Frame(self.transaction_tab, bg=self.SECONDARY_COLOR)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
 
@@ -602,43 +598,6 @@ class AdminDashboard:
         self.transactions_tree.bind('<Double-1>', self.on_admin_tree_double_click)
 
         self.load_transactions()
-
-    def process_return(self):
-        selection = self.transactions_tree.selection()
-        if not selection:
-            messagebox.showwarning("Warning", "Please select a borrowed transaction to return.")
-            return
-
-        item = self.transactions_tree.item(selection[0], 'values')
-        trans_id = item[0]
-        book_title = item[2]
-        trans_type = item[3]
-        quantity = item[4] if len(item) > 4 else 1
-
-        if "BORROW" not in str(trans_type).upper():
-            messagebox.showwarning("Warning", "Only 'BORROWED' books can be returned.")
-            return
-
-        if messagebox.askyesno("Confirm", f"Process return for '{book_title}'?"):
-            try:
-                books = self.db_manager.get_all_books()
-                book_id = None
-                for book in books:
-                    if book['title'] == book_title:
-                        book_id = book['book_id']
-                        break
-
-                if book_id is None:
-                    messagebox.showerror("Error", "Could not find book ID for this transaction.")
-                    return
-
-                self.db_manager.return_book(trans_id, book_id, quantity)
-                messagebox.showinfo("Success", "Book returned successfully! Transaction logged.")
-                self.load_transactions()
-                self.load_book_status()
-                self.load_books()
-            except Exception as e:
-                messagebox.showerror("Error", f"Could not process return: {e}")
 
     def setup_requests_tab(self):
         button_frame = tk.Frame(self.requests_tab, bg=self.ACCENT_COLOR, relief=tk.RAISED, bd=2)
