@@ -1,16 +1,13 @@
 import sqlite3
 from datetime import datetime
 
-# Using a test DB name so it doesn't mess with your main library.db yet
 DB_NAME = "test_library_requests.db"
 
 
 def init_test_db():
-    """Sets up a test database with books and transactions tables."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
-    # Mock Books Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS books (
             ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -19,7 +16,6 @@ def init_test_db():
         )
     ''')
 
-    # Transactions Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,7 +27,6 @@ def init_test_db():
         )
     ''')
 
-    # Seed some dummy books if the table is empty
     cursor.execute("SELECT COUNT(*) FROM books")
     if cursor.fetchone()[0] == 0:
         cursor.executemany("INSERT INTO books (Title, Available) VALUES (?, ?)", [
@@ -54,13 +49,11 @@ def get_all_books():
 
 
 def request_books(user_id, cart_items):
-    """Adds books as 'Pending' for the admin to review."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     date_requested = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     for item in cart_items:
-        # --- NEW STOCK VALIDATION SYSTEM ---
         cursor.execute("SELECT Available, Title FROM books WHERE ID = ?", (item['book_id'],))
         result = cursor.fetchone()
 
@@ -74,13 +67,12 @@ def request_books(user_id, cart_items):
                 messagebox.showerror("Stock Error",
                                      f"Cannot borrow {requested_qty}. Only {current_stock} copies of '{title}' are available!")
                 conn.close()
-                return  # Halts the loop so no items are wrongfully inserted
+                return
         else:
             from tkinter import messagebox
             messagebox.showerror("Error", "Book not found in the database.")
             conn.close()
             return
-        # --- END NEW STOCK VALIDATION ---
 
         cursor.execute("""
             INSERT INTO transactions (user_id, book_id, quantity, status, date) 
@@ -92,7 +84,6 @@ def request_books(user_id, cart_items):
 
 
 def get_pending_requests():
-    """Fetches all pending requests for the admin."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
@@ -107,7 +98,6 @@ def get_pending_requests():
 
 
 def admin_approve_request(transaction_id, user_id, book_id, quantity):
-    """Updates Pending to Approved, creates Active, and deducts inventory."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -128,7 +118,6 @@ def admin_approve_request(transaction_id, user_id, book_id, quantity):
 
 
 def get_active_transactions(user_id):
-    """Fetches active checkouts for a specific user to return."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
@@ -143,7 +132,6 @@ def get_active_transactions(user_id):
 
 
 def return_book(transaction_id, book_id, quantity):
-    """Marks an Active transaction as Returned and restores inventory."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("UPDATE transactions SET status = 'Returned' WHERE id = ?", (transaction_id,))
@@ -152,5 +140,4 @@ def return_book(transaction_id, book_id, quantity):
     conn.close()
 
 
-# Initialize the test database when this file is imported
 init_test_db()

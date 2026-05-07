@@ -2,17 +2,14 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import book_requests_db as db
 
-
 class BookRequestSystem(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Library Request System Module")
         self.geometry("900x600")
 
-        # Test User ID
         self.current_user = "nikkko"
 
-        # Top Navigation
         self.header = tk.Frame(self, bg="#D92139", height=50)
         self.header.pack(fill="x")
         self.header.pack_propagate(False)
@@ -21,7 +18,6 @@ class BookRequestSystem(tk.Tk):
                                      bg="#D92139", fg="white", font=("Arial", 20, "bold"))
         self.header_label.pack(pady=10, padx=20, side="left")
 
-        # Main Tabview using ttk.Notebook
         self.tabview = ttk.Notebook(self)
         self.tabview.pack(fill="both", expand=True, padx=20, pady=20)
 
@@ -38,9 +34,6 @@ class BookRequestSystem(tk.Tk):
         self.setup_user_transactions_tab()
         self.setup_admin_tab()
 
-    # ==========================
-    # USER: REQUEST BOOKS TAB
-    # ==========================
     def setup_user_request_tab(self):
         controls_frame = tk.Frame(self.tab_user)
         controls_frame.pack(pady=10)
@@ -71,7 +64,6 @@ class BookRequestSystem(tk.Tk):
         self.cart_display = tk.Text(self.tab_user, width=70, height=12)
         self.cart_display.pack(pady=10)
 
-        # Hard block typing and pasting, without touching the submit_request method below
         self.cart_display.bind("<Key>", lambda e: "break")
         self.cart_display.bind("<Button-2>", lambda e: "break")
         self.cart_display.bind("<Button-3>", lambda e: "break")
@@ -88,7 +80,6 @@ class BookRequestSystem(tk.Tk):
             return
 
         try:
-            # Handle tuple or dict safely
             book_id = next((b[0] if isinstance(b, tuple) else b.get('book_id')) for b in self.available_books if
                            (b[1] if isinstance(b, tuple) else b.get('title')) == title)
         except StopIteration:
@@ -104,13 +95,9 @@ class BookRequestSystem(tk.Tk):
             self.cart.clear()
             self.cart_display.delete("1.0", "end")
             self.cart_display.insert("end", "✅ Request submitted successfully! Waiting for Admin approval.\n")
-            self.refresh_admin_tab()  # Auto-refresh admin view for testing
+            self.refresh_admin_tab()
 
-    # ==========================
-    # ADMIN: PENDING REQUESTS
-    # ==========================
     def setup_admin_tab(self):
-        # UPGRADE: Replaced tk.Text with ttk.Treeview to fix barcode/quantity layout & enable double-clicking
         columns = ("ID", "User", "Title", "Qty", "Date", "Barcode")
         self.admin_tree = ttk.Treeview(self.tab_admin, columns=columns, show="headings", height=8)
 
@@ -125,13 +112,11 @@ class BookRequestSystem(tk.Tk):
         self.admin_tree.column("Barcode", width=120)
         self.admin_tree.pack(pady=10, fill="x", padx=20)
 
-        # Allow Double Clicking!
         self.admin_tree.bind("<Double-1>", self.on_admin_double_click)
 
         controls_frame = tk.Frame(self.tab_admin)
         controls_frame.pack(pady=10)
 
-        # Approve Section
         self.approve_id_entry = tk.Entry(controls_frame, width=35)
         self.approve_id_entry.insert(0, "Enter Transaction ID to Approve")
         self.approve_id_entry.bind("<FocusIn>", lambda e: self.approve_id_entry.delete(0,
@@ -142,7 +127,6 @@ class BookRequestSystem(tk.Tk):
                                      command=self.approve_request, relief="flat", padx=10, pady=2)
         self.approve_btn.grid(row=0, column=1, padx=10, pady=5)
 
-        # Reject Section
         self.reject_id_entry = tk.Entry(controls_frame, width=35)
         self.reject_id_entry.insert(0, "Enter Transaction ID to Reject")
         self.reject_id_entry.bind("<FocusIn>", lambda e: self.reject_id_entry.delete(0,
@@ -160,7 +144,6 @@ class BookRequestSystem(tk.Tk):
         if selected:
             item = self.admin_tree.item(selected[0])
             req_id = item['values'][0]
-            # Auto fill both entries
             self.approve_id_entry.delete(0, 'end')
             self.approve_id_entry.insert(0, str(req_id))
             self.reject_id_entry.delete(0, 'end')
@@ -177,7 +160,6 @@ class BookRequestSystem(tk.Tk):
             return
 
         for req in pending:
-            # Safely fetch keys whether it's a dict or a tuple
             if isinstance(req, dict):
                 self.admin_tree.insert("", "end", values=(
                     req.get('transaction_id'), req.get('username'), req.get('title'),
@@ -192,7 +174,6 @@ class BookRequestSystem(tk.Tk):
         if not trans_id.isdigit(): return
         trans_id = int(trans_id)
 
-        # Dictionary safe indexing
         def get_id(r):
             return r.get('transaction_id') if isinstance(r, dict) else r[0]
 
@@ -219,20 +200,15 @@ class BookRequestSystem(tk.Tk):
         req = next((r for r in self.pending_requests_data if get_id(r) == trans_id), None)
 
         if req:
-            # FIX: Used proper DB method instead of buggy inline sqlite code (`WHERE id = ?` -> `transaction_id = ?`)
             try:
                 db.update_request_status(trans_id, 'Rejected')
             except Exception:
-                pass  # Just in case connection drops
+                pass
 
             self.reject_id_entry.delete(0, 'end')
             self.refresh_admin_tab()
 
-    # ==========================
-    # USER: MY TRANSACTIONS
-    # ==========================
     def setup_user_transactions_tab(self):
-        # UPGRADE: Replaced tk.Text with ttk.Treeview to fix quantity display and prevent typing
         columns = ("ID", "Title", "Qty", "Date", "Status")
         self.trans_tree = ttk.Treeview(self.tab_user_transactions, columns=columns, show="headings", height=8)
 
@@ -246,7 +222,6 @@ class BookRequestSystem(tk.Tk):
         self.trans_tree.column("Status", width=100)
         self.trans_tree.pack(pady=10, fill="x", padx=20)
 
-        # Adding double click for returning too
         self.trans_tree.bind("<Double-1>", self.on_trans_double_click)
 
         controls_frame = tk.Frame(self.tab_user_transactions)
@@ -314,7 +289,6 @@ class BookRequestSystem(tk.Tk):
             db.return_book(transaction_id=trans_id, book_id=b_id, quantity_str=str(qty))
             self.return_id_entry.delete(0, 'end')
             self.refresh_user_transactions()
-
 
 if __name__ == "__main__":
     app = BookRequestSystem()

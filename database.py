@@ -1,7 +1,6 @@
 import sqlite3
 from datetime import datetime, timedelta
 
-
 class DatabaseManager:
     def __init__(self, db_name="library.db"):
         self.db_name = db_name
@@ -37,13 +36,11 @@ class DatabaseManager:
             due_date TEXT
         )''')
 
-        # AUTO-MIGRATION: Safely add the 'status' column if missing
         try:
             cursor.execute("SELECT status FROM transactions LIMIT 1")
         except sqlite3.OperationalError:
             cursor.execute("ALTER TABLE transactions ADD COLUMN status TEXT DEFAULT 'Active'")
 
-        # AUTO-MIGRATION & DATA FIX: Safely add the 'quantity' column and clean up glitchy UI data
         try:
             cursor.execute("SELECT quantity FROM transactions LIMIT 1")
         except sqlite3.OperationalError:
@@ -58,7 +55,6 @@ class DatabaseManager:
         conn.commit()
         conn.close()
 
-    # --- User Methods ---
     def register_user(self, username, password, role):
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -87,7 +83,6 @@ class DatabaseManager:
         conn.close()
         return dict(user) if user else None
 
-    # --- Book Methods ---
     def get_all_books(self):
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -124,7 +119,6 @@ class DatabaseManager:
         conn.commit()
         conn.close()
 
-    # --- Standard Transactions ---
     def get_all_transactions(self):
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -139,7 +133,6 @@ class DatabaseManager:
         return trans
 
     def get_user_borrowed_books(self, user_id):
-        """Returns all transactions for the user by user ID."""
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('''SELECT t.transaction_id, b.title, t.transaction_date, t.due_date,
@@ -152,7 +145,6 @@ class DatabaseManager:
         return books
 
     def get_active_transactions(self, username):
-        """Returns active AND returned transactions for the student view (by username)"""
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('''SELECT t.transaction_id, b.title, t.transaction_date, t.due_date,
@@ -166,7 +158,6 @@ class DatabaseManager:
         conn.close()
         return books
 
-    # --- Book Request & Approval Logic ---
     def add_book_request(self, user_id, book_id, qty):
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -202,7 +193,6 @@ class DatabaseManager:
             self.add_book_request(user_id, item['book_id'], item['qty'])
 
     def get_pending_requests(self):
-        """Returns pending requests + the ISBN so Barcodes load properly."""
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('''SELECT t.transaction_id,
@@ -248,7 +238,6 @@ class DatabaseManager:
         conn.close()
 
     def update_request_status(self, req_id, status):
-        """Fix for Rejecting items."""
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute("UPDATE transactions SET status=? WHERE transaction_id=?", (status, req_id))
@@ -263,7 +252,6 @@ class DatabaseManager:
         except ValueError:
             qty = 1
 
-        # Marks the Active query as Returned, solving the missing log bug
         cursor.execute("UPDATE transactions SET status='Returned', transaction_type='RETURN' WHERE transaction_id=?",
                        (transaction_id,))
         cursor.execute("UPDATE books SET available_quantity = available_quantity + ? WHERE book_id=?",

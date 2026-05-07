@@ -6,7 +6,6 @@ from database import DatabaseManager
 from barcode_scanner import BarcodeScannerWindow
 from barcode_generator import BarcodeGenerator
 
-
 class LoginWindow:
     def __init__(self, root, on_login_callback, db_manager):
         self.root = root
@@ -618,7 +617,6 @@ class AdminDashboard:
         tree_frame = tk.Frame(self.requests_tab, bg=self.SECONDARY_COLOR)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
 
-        # FIXED: Added Barcode explicitly to columns
         columns = ("Req ID", "User", "Book Title", "Qty", "Status", "Barcode")
         self.requests_tree = ttk.Treeview(tree_frame, columns=columns, height=15, show="headings")
 
@@ -749,7 +747,6 @@ class AdminDashboard:
             messagebox.showwarning("Warning", "Select a request to reject.")
             return
 
-        # Explicitly converting this to an integer fixes the silent crash
         req_id = int(self.requests_tree.item(selection[0], 'values')[0])
         try:
             self.db_manager.update_request_status(req_id, "Rejected")
@@ -982,7 +979,6 @@ class StudentDashboard:
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=20, pady=(20, 10))
 
-        # --- TAB 1: Library Books ---
         self.books_frame = tk.Frame(self.notebook, bg=self.BG_COLOR)
         self.notebook.add(self.books_frame, text="Library Books")
 
@@ -1009,7 +1005,6 @@ class StudentDashboard:
         self.books_tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         self.books_tree.bind('<Double-1>', self.on_book_selected)
 
-        # --- TAB 2: My Transactions ---
         self.trans_frame = tk.Frame(self.notebook, bg=self.BG_COLOR)
         self.notebook.add(self.trans_frame, text="My Transactions")
 
@@ -1032,7 +1027,6 @@ class StudentDashboard:
 
         self.trans_tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=(20, 5))
 
-        # FIXED: Added the Return UI explicitly into the student dashboard
         ret_frame = tk.Frame(self.trans_frame, bg=self.BG_COLOR)
         ret_frame.pack(fill=tk.X, padx=10, pady=10)
 
@@ -1041,7 +1035,6 @@ class StudentDashboard:
         tk.Button(ret_frame, text="Return Selected Book", bg="#28A745", fg="#FFFFFF", relief=tk.FLAT,
                   font=("Segoe UI", 11, "bold"), command=self.process_return).pack(side=tk.RIGHT, padx=10)
 
-        # --- BOTTOM SECTION: Request Book Form ---
         self.request_frame = tk.Frame(self.root, bg=self.SECONDARY_COLOR, height=130)
         self.request_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=20, pady=(0, 20))
         self.request_frame.pack_propagate(False)
@@ -1071,7 +1064,6 @@ class StudentDashboard:
                                  state=tk.DISABLED)
         self.cart_text.pack(side=tk.LEFT, fill=tk.Y)
 
-        # FIXED: Hard-blocked the mouse pasting triggers (middle and right clicks) along with typing
         self.cart_text.bind("<Key>", lambda e: "break")
         self.cart_text.bind("<Button-2>", lambda e: "break")
         self.cart_text.bind("<Button-3>", lambda e: "break")
@@ -1260,7 +1252,6 @@ class StudentDashboard:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to generate barcode: {str(e)}")
 
-
 class LibraryManagementApp:
     def __init__(self, root):
         self.root = root
@@ -1298,7 +1289,6 @@ class LibraryManagementApp:
         for widget in self.root.winfo_children():
             widget.destroy()
         dashboard = AdminDashboard(self.root, user_data, self.db_manager, self.show_login_window)
-
 
 if __name__ == "__main__":
     root = tk.Tk()
