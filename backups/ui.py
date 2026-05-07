@@ -1,4 +1,4 @@
-import tkinter as tk
+'''import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 import hashlib
 from PIL import Image, ImageTk
@@ -383,6 +383,30 @@ class AdminDashboard:
 
         self.setup_ui()
 
+    def on_admin_tree_double_click(self, event):
+        widget = event.widget
+        selection = widget.selection()
+        if not selection:
+            return
+
+        item = selection[0]
+        values = widget.item(item, 'values')
+
+        title = None
+        if widget == getattr(self, 'status_tree', None):
+            title = values[0]
+        elif widget == getattr(self, 'transactions_tree', None):
+            title = values[2]
+        elif widget == getattr(self, 'requests_tree', None):
+            title = values[2]
+
+        if title:
+            books = self.db_manager.get_all_books()
+            for b in books:
+                if b['title'] == title:
+                    self.show_barcode(b['book_id'], b['title'], b['author'], b['isbn'])
+                    break
+
     def setup_ui(self):
         self.root.configure(bg=self.SECONDARY_COLOR)
 
@@ -568,6 +592,9 @@ class AdminDashboard:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.status_tree.configure(yscroll=scrollbar.set)
 
+        # Enables global double click barcode fetch for this tree
+        self.status_tree.bind('<Double-1>', self.on_admin_tree_double_click)
+
         refresh_btn = tk.Button(status_frame, text="🔄 REFRESH STATS", font=("Helvetica", 11, "bold"),
                                 bg=self.PRIMARY_COLOR, fg=self.SECONDARY_COLOR, command=self.load_book_status,
                                 relief=tk.FLAT, cursor="hand2", padx=15, pady=8)
@@ -609,6 +636,9 @@ class AdminDashboard:
         scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.transactions_tree.yview)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.transactions_tree.configure(yscroll=scrollbar.set)
+
+        # Enables global double click barcode fetch for this tree
+        self.transactions_tree.bind('<Double-1>', self.on_admin_tree_double_click)
 
         self.load_transactions()
 
@@ -686,6 +716,9 @@ class AdminDashboard:
         scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.requests_tree.yview)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.requests_tree.configure(yscroll=scrollbar.set)
+
+        # Enables global double click barcode fetch for this tree
+        self.requests_tree.bind('<Double-1>', self.on_admin_tree_double_click)
 
         self.load_requests()
 
@@ -775,7 +808,7 @@ class AdminDashboard:
             requests = self.db_manager.get_pending_requests()
             for req in requests:
                 self.requests_tree.insert('', tk.END, values=(
-                    req['request_id'], req['username'], req['title'], req['qty'], req['status']
+                    req['transaction_id'], req['username'], req['title'], req['qty_requested'], "Pending"
                 ))
         except Exception as e:
             pass
@@ -786,16 +819,25 @@ class AdminDashboard:
             messagebox.showwarning("Warning", "Select a request to approve.")
             return
 
-        req_id = self.requests_tree.item(selection[0], 'values')[0]
-        try:
-            self.db_manager.update_request_status(req_id, "Approved")
-            messagebox.showinfo("Success", "Request Approved.")
-            self.load_requests()
-            self.load_book_status()
-            self.load_books()
-            self.load_transactions()
-        except Exception as e:
-            messagebox.showerror("Error", f"Could not approve: {e}")
+        req_id = int(self.requests_tree.item(selection[0], 'values')[0])
+
+        # Fetch the full request details to properly log the quantity and book ID
+        pending = self.db_manager.get_pending_requests()
+        req = next((r for r in pending if r['transaction_id'] == req_id), None)
+
+        if req:
+            try:
+                self.db_manager.admin_approve_request(req['transaction_id'], req['user_id'], req['book_id'],
+                                                      req['qty_requested'])
+                messagebox.showinfo("Success", "Request Approved.")
+                self.load_requests()
+                self.load_book_status()
+                self.load_books()
+                self.load_transactions()
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not approve: {e}")
+        else:
+            messagebox.showerror("Error", "Request not found.")
 
     def reject_request(self):
         selection = self.requests_tree.selection()
@@ -978,7 +1020,8 @@ class AdminDashboard:
             quantity = trans.get('quantity', 1) if trans.get('quantity') else 1
             self.transactions_tree.insert('', tk.END,
                                           values=(trans['transaction_id'], trans['username'], trans['title'],
-                                                  trans['transaction_type'].upper(), quantity, trans['transaction_date'][:10],
+                                                  trans['transaction_type'].upper(), quantity,
+                                                  trans['transaction_date'][:10],
                                                   due_date[:10] if due_date != "N/A" else "N/A"))
 
     def logout(self):
@@ -1115,8 +1158,11 @@ class StudentDashboard:
         bottom_req = tk.Frame(self.request_frame, bg=self.SECONDARY_COLOR)
         bottom_req.pack(fill=tk.BOTH, expand=True, padx=15, pady=(0, 10))
 
-        self.cart_text = tk.Text(bottom_req, height=3, width=60, bg=self.BG_COLOR, fg=self.TEXT_COLOR, state=tk.DISABLED)
+        self.cart_text = tk.Text(bottom_req, height=3, width=60, bg=self.BG_COLOR, fg=self.TEXT_COLOR,
+                                 state=tk.DISABLED)
         self.cart_text.pack(side=tk.LEFT, fill=tk.Y)
+        # Prevents any keyboard typing inside the cart display
+        self.cart_text.bind("<Key>", lambda e: "break")
 
         tk.Button(bottom_req, text="Submit Request to Admin", bg="#28A745", fg="#FFFFFF", font=("Segoe UI", 10, "bold"),
                   relief=tk.FLAT, command=self.submit_request).pack(side=tk.LEFT, padx=20)
@@ -1331,4 +1377,4 @@ class LibraryManagementApp:
     def show_admin_dashboard(self, user_data):
         for widget in self.root.winfo_children():
             widget.destroy()
-        dashboard = AdminDashboard(self.root, user_data, self.db_manager, self.show_login_window)
+        dashboard = AdminDashboard(self.root, user_data, self.db_manager, self.show_login_window)'''
