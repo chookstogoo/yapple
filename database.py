@@ -130,7 +130,7 @@ class DatabaseManager:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('''SELECT t.transaction_id, u.username, b.title, t.transaction_type,
-                                 t.transaction_date, t.due_date
+                                 t.transaction_date, t.due_date, t.quantity
                           FROM transactions t
                           JOIN users u ON t.user_id = u.user_id
                           JOIN books b ON t.book_id = b.book_id
@@ -271,7 +271,7 @@ class DatabaseManager:
             qty = int(quantity_str)
         except ValueError:
             qty = 1
-        cursor.execute("UPDATE transactions SET status='Returned' WHERE transaction_id=?", (transaction_id,))
+        cursor.execute("UPDATE transactions SET status='Returned', transaction_type='RETURN' WHERE transaction_id=?", (transaction_id,))
         cursor.execute("UPDATE books SET available_quantity = available_quantity + ? WHERE book_id=?",
                        (qty, book_id))
         conn.commit()

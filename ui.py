@@ -372,12 +372,14 @@ class AdminDashboard:
         self.user_data = user_data
         self.db_manager = db_manager
         self.logout_callback = logout_callback
+        self.barcode_generator = BarcodeGenerator()
 
         # Light Theme Colors
         self.PRIMARY_COLOR = "#DC143C"
         self.SECONDARY_COLOR = "#FFFFFF"
         self.TEXT_COLOR = "#333333"
         self.ACCENT_COLOR = "#F5F5F5"
+        self.BG_COLOR = "#F5F5F5"
 
         self.setup_ui()
 
@@ -482,6 +484,7 @@ class AdminDashboard:
         scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.books_tree.yview)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.books_tree.configure(yscroll=scrollbar.set)
+        self.books_tree.bind('<Double-1>', self.on_book_selected)
 
         self.load_books()
 
@@ -589,17 +592,17 @@ class AdminDashboard:
         tree_frame = tk.Frame(self.transaction_tab, bg=self.SECONDARY_COLOR)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
 
-        columns = ("ID", "User", "Book Title", "Type", "Date", "Due Date")
+        columns = ("ID", "User", "Book Title", "Type", "Quantity", "Date", "Due Date")
         self.transactions_tree = ttk.Treeview(tree_frame, columns=columns, height=15, show="headings")
 
         for col in columns:
             self.transactions_tree.heading(col, text=col)
             if col == "ID":
                 self.transactions_tree.column(col, width=30)
-            elif col in ("Type", "Date", "Due Date"):
-                self.transactions_tree.column(col, width=90)
+            elif col in ("Type", "Quantity", "Date", "Due Date"):
+                self.transactions_tree.column(col, width=85)
             else:
-                self.transactions_tree.column(col, width=110)
+                self.transactions_tree.column(col, width=100)
 
         self.transactions_tree.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
 
@@ -619,6 +622,7 @@ class AdminDashboard:
         trans_id = item[0]
         book_title = item[2]
         trans_type = item[3]
+        quantity = item[4] if len(item) > 4 else 1
 
         if "BORROW" not in str(trans_type).upper():
             messagebox.showwarning("Warning", "Only 'BORROWED' books can be returned.")
@@ -626,21 +630,25 @@ class AdminDashboard:
 
         if messagebox.askyesno("Confirm", f"Process return for '{book_title}'?"):
             try:
-                # Update transaction to RETURN and give the book back to inventory
-                cursor = self.db_manager.conn.cursor()
-                cursor.execute("UPDATE transactions SET transaction_type = 'RETURN' WHERE transaction_id = ?",
-                               (trans_id,))
-                cursor.execute("UPDATE books SET available_quantity = available_quantity + 1 WHERE title = ?",
-                               (book_title,))
-                self.db_manager.conn.commit()
+                # Get book_id from title
+                books = self.db_manager.get_all_books()
+                book_id = None
+                for book in books:
+                    if book['title'] == book_title:
+                        book_id = book['book_id']
+                        break
+
+                if book_id is None:
+                    messagebox.showerror("Error", "Could not find book ID for this transaction.")
+                    return
+
+                # Use the database manager's return_book method
+                self.db_manager.return_book(trans_id, book_id, quantity)
 
                 messagebox.showinfo("Success", "Book returned successfully! Transaction logged.")
                 self.load_transactions()
                 self.load_book_status()
                 self.load_books()
-            except AttributeError:
-                messagebox.showerror("Error",
-                                     "Could not access database connection directly. Please check DatabaseManager.")
             except Exception as e:
                 messagebox.showerror("Error", f"Could not process return: {e}")
 
@@ -692,6 +700,72 @@ class AdminDashboard:
                 book['book_id'], book['title'], book['author'],
                 book['isbn'], book['quantity'], book['available_quantity']
             ))
+
+    def on_book_selected(self, event):
+        selection = self.books_tree.selection()
+        if not selection:
+            return
+
+        item = selection[0]
+        values = self.books_tree.item(item, 'values')
+
+        if len(values) >= 4:
+            book_id, title, author, isbn = values[0], values[1], values[2], values[3]
+            self.show_barcode(int(book_id), title, author, isbn)
+
+    def show_barcode(self, book_id, title, author, isbn):
+        barcode_window = tk.Toplevel(self.root)
+        barcode_window.title("Book Info")
+        barcode_window.geometry("380x420")
+        barcode_window.configure(bg=self.BG_COLOR)
+        barcode_window.resizable(False, False)
+
+        header = tk.Frame(barcode_window, bg=self.PRIMARY_COLOR, height=50)
+        header.pack(fill=tk.X)
+        header.pack_propagate(False)
+
+        header_label = tk.Label(header, text="Book Details & Barcode", font=("Segoe UI", 12, "bold"), fg="#FFFFFF",
+                                bg=self.PRIMARY_COLOR)
+        header_label.pack(pady=10)
+
+        content = tk.Frame(barcode_window, bg=self.BG_COLOR)
+        content.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
+
+        info_frame = tk.Frame(content, bg=self.SECONDARY_COLOR, relief=tk.FLAT, bd=0)
+        info_frame.pack(fill=tk.X, pady=(0, 12))
+
+        info_items = [
+            ("Title:", title[:35]),
+            ("Author:", author[:30]),
+            ("ISBN:", isbn),
+            ("Book ID:", str(book_id))
+        ]
+
+        for label_text, value_text in info_items:
+            item_frame = tk.Frame(info_frame, bg=self.SECONDARY_COLOR)
+            item_frame.pack(fill=tk.X, padx=10, pady=4)
+
+            icon_label = tk.Label(item_frame, text=label_text, font=("Segoe UI", 10, "bold"), fg=self.PRIMARY_COLOR,
+                                  bg=self.SECONDARY_COLOR, width=8, anchor="w")
+            icon_label.pack(side=tk.LEFT, padx=(0, 5))
+
+            value = tk.Label(item_frame, text=value_text, font=("Segoe UI", 10), fg=self.TEXT_COLOR,
+                             bg=self.SECONDARY_COLOR, wraplength=230, justify=tk.LEFT)
+            value.pack(side=tk.LEFT)
+
+        barcode_section = tk.Frame(content, bg=self.SECONDARY_COLOR, relief=tk.FLAT, bd=0)
+        barcode_section.pack(fill=tk.BOTH, expand=True, pady=8)
+
+        barcode_label = tk.Label(barcode_section, bg=self.SECONDARY_COLOR)
+        barcode_label.pack(pady=15)
+
+        try:
+            barcode_image = self.barcode_generator.generate_barcode(str(isbn))
+            barcode_photo = ImageTk.PhotoImage(barcode_image)
+            barcode_label.config(image=barcode_photo)
+            barcode_label.image = barcode_photo
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to generate barcode: {str(e)}")
 
     def load_requests(self):
         for item in self.requests_tree.get_children():
@@ -901,9 +975,10 @@ class AdminDashboard:
         transactions = self.db_manager.get_all_transactions()
         for trans in transactions:
             due_date = trans['due_date'] if trans['due_date'] else "N/A"
+            quantity = trans.get('quantity', 1) if trans.get('quantity') else 1
             self.transactions_tree.insert('', tk.END,
                                           values=(trans['transaction_id'], trans['username'], trans['title'],
-                                                  trans['transaction_type'].upper(), trans['transaction_date'][:10],
+                                                  trans['transaction_type'].upper(), quantity, trans['transaction_date'][:10],
                                                   due_date[:10] if due_date != "N/A" else "N/A"))
 
     def logout(self):
@@ -997,17 +1072,19 @@ class StudentDashboard:
         self.trans_frame = tk.Frame(self.notebook, bg=self.BG_COLOR)
         self.notebook.add(self.trans_frame, text="My Transactions")
 
-        t_columns = ('Title', 'Borrowed Date', 'Due Date', 'Status')
+        t_columns = ('Title', 'Quantity', 'Borrowed Date', 'Due Date', 'Status')
         self.trans_tree = ttk.Treeview(self.trans_frame, columns=t_columns, show='headings')
 
         self.trans_tree.heading('Title', text='Book Title')
+        self.trans_tree.heading('Quantity', text='Quantity')
         self.trans_tree.heading('Borrowed Date', text='Request Date')
         self.trans_tree.heading('Due Date', text='Due Date')
         self.trans_tree.heading('Status', text='Status')
 
-        self.trans_tree.column('Title', width=350)
-        self.trans_tree.column('Borrowed Date', width=150)
-        self.trans_tree.column('Due Date', width=150)
+        self.trans_tree.column('Title', width=300)
+        self.trans_tree.column('Quantity', width=80)
+        self.trans_tree.column('Borrowed Date', width=130)
+        self.trans_tree.column('Due Date', width=130)
         self.trans_tree.column('Status', width=100)
 
         self.trans_tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=20)
@@ -1038,7 +1115,7 @@ class StudentDashboard:
         bottom_req = tk.Frame(self.request_frame, bg=self.SECONDARY_COLOR)
         bottom_req.pack(fill=tk.BOTH, expand=True, padx=15, pady=(0, 10))
 
-        self.cart_text = tk.Text(bottom_req, height=3, width=60, bg=self.BG_COLOR, fg=self.TEXT_COLOR)
+        self.cart_text = tk.Text(bottom_req, height=3, width=60, bg=self.BG_COLOR, fg=self.TEXT_COLOR, state=tk.DISABLED)
         self.cart_text.pack(side=tk.LEFT, fill=tk.Y)
 
         tk.Button(bottom_req, text="Submit Request to Admin", bg="#28A745", fg="#FFFFFF", font=("Segoe UI", 10, "bold"),
@@ -1100,7 +1177,9 @@ class StudentDashboard:
 
         book_title = book_selection.split("]")[1].split("(Avail")[0].strip()
 
+        self.cart_text.config(state=tk.NORMAL)
         self.cart_text.insert(tk.END, f"{book_title} (Qty: {qty})\n")
+        self.cart_text.config(state=tk.DISABLED)
         self.cart_items.append((book_selection, req_qty))
 
         self.book_combo.set('')
@@ -1121,7 +1200,9 @@ class StudentDashboard:
 
             messagebox.showinfo("Success", "Request sent to Admin successfully!")
 
+            self.cart_text.config(state=tk.NORMAL)
             self.cart_text.delete(1.0, tk.END)
+            self.cart_text.config(state=tk.DISABLED)
             self.cart_items.clear()
             self._sync_cart_visibility()
 
@@ -1139,8 +1220,9 @@ class StudentDashboard:
             borrow_date = str(t['transaction_date'])[:16] if t['transaction_date'] else "N/A"
             due_date = str(t['due_date'])[:16] if t['due_date'] else "N/A"
             status = t.get('status', 'Unknown')
+            quantity = t.get('quantity', 1)
 
-            self.trans_tree.insert('', tk.END, values=(t['title'], borrow_date, due_date, status))
+            self.trans_tree.insert('', tk.END, values=(t['title'], quantity, borrow_date, due_date, status))
 
     def auto_update_transactions(self):
         self.load_transactions()
